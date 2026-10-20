@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1a2a" />
+  <meta name="description" content="Pumpkin Island 南瓜岛 — a WebGL island city built with Three.js r128: GPU water ripples, caustics, glass towers, bridges, day/night and rain." />
+  <title>Pumpkin Island</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cellipse cx='32' cy='38' rx='26' ry='20' fill='%23f08a1c'/%3E%3Cellipse cx='32' cy='38' rx='10' ry='20' fill='%23f6a03c'/%3E%3Crect x='29' y='8' width='6' height='12' rx='2' fill='%232f7d32'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"
+    integrity="sha512-dLxUelApnYxpLt6K2iomGngnHO83iUvZytA3YjDUCjT0HDOHKXnVYdf3hU4JjM8uEhxf9nD1/ey98U3t2vZ0qQ=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="labels"></div>
+
+  <header id="title">
+    <div class="logo" aria-hidden="true"></div>
+    <div>
+      <h1>Pumpkin Island</h1>
+      <p>南瓜岛 · 群岛之城</p>
+    </div>
+  </header>
+
+  <button id="panel-toggle" class="icon-btn" aria-label="设置">
+    <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+  </button>
+
+  <aside id="panel">
+    <section>
+      <h2>天气 Weather</h2>
+      <div class="seg" data-group="weather">
+        <button data-value="sunny" class="active">晴天</button>
+        <button data-value="rain">雨天</button>
+      </div>
+    </section>
+    <section>
+      <h2>时间 Time <span id="time-text">15:30</span></h2>
+      <input id="time-slider" type="range" min="0" max="24" step="0.05" value="15.5" />
+      <div class="chips">
+        <button data-time="6.2">日出</button>
+        <button data-time="12">正午</button>
+        <button data-time="18.1">黄昏</button>
+        <button data-time="22">夜晚</button>
+        <label class="toggle"><input id="auto-time" type="checkbox" /> 自动昼夜</label>
+      </div>
+    </section>
+    <section>
+      <h2>视角 View</h2>
+      <div class="seg" data-group="mode">
+        <button data-value="orbit" class="active">环绕</button>
+        <button data-value="walk">漫游</button>
+      </div>
+      <label class="toggle"><input id="show-labels" type="checkbox" checked /> 显示名称</label>
+    </section>
+    <section>
+      <h2>地点 Places</h2>
+      <div id="places" class="places"></div>
+    </section>
+  </aside>
+
+  <section id="info" hidden>
+    <button class="close" aria-label="关闭">&times;</button>
+    <span class="cat"></span>
+    <h3 class="name"></h3>
+    <p class="en"></p>
+    <p class="desc"></p>
+    <p class="coords"></p>
+    <div class="actions"><button class="primary focus-btn">环绕观察</button></div>
+  </section>
+
+  <div id="hint"></div>
+
+  <div id="joystick" hidden><div class="knob"></div></div>
+  <div id="vbtns" hidden>
+    <button data-v="1" aria-label="上升">▲</button>
+    <button data-v="-1" aria-label="下降">▼</button>
+  </div>
+
+  <div id="loader">
+    <div class="loader-card">
+      <div class="logo big" aria-hidden="true"></div>
+      <h1>Pumpkin Island</h1>
+      <div class="bar"><div class="fill"></div></div>
+      <p class="status">正在加载…</p>
+    </div>
+  </div>
+
+  <noscript>需要启用 JavaScript 才能浏览 Pumpkin Island。</noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

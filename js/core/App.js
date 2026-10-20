@@ -1,0 +1,203 @@
+// Application bootstrap: renderer, world assembly, render loop.
+import { QUALITY, IS_MOBILE } from '../config/world.config.js';
+import { OccupancyMask } from './Mask.js';
+import { CameraControls } from './CameraControls.js';
+import { Interaction } from './Interaction.js';
+import { lerp, clamp } from './Utils.js';
+import { Terrain } from '../world/Terrain.js';
+import { Water, LAYER_DETAIL } from '../world/Water.js';
+import { Sky } from '../world/Sky.js';
+import { Environment } from '../world/Environment.js';
+import { Bridges } from '../world/Bridges.js';
+import { RoadNetwork } from '../world/Roads.js';
+import { StreetFurniture } from '../world/StreetFurniture.js';
+import { City } from '../world/City.js';
+import { GroundMap } from '../nature/GroundMap.js';
+import { Grass } from '../nature/Grass.js';
+import { Trees } from '../nature/Trees.js';
+import { Animals } from '../nature/Animals.js';
+
+const THREE = window.THREE;
+const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
+
+export class App {
+  constructor(container, ui) {
+    this.container = container;
+    this.ui = ui;
+  }
+
+  async init() {
+    const ui = this.ui;
+    ui.progress(0.05, '初始化渲染器…');
+    const renderer = new THREE.WebGLRenderer({ antialias: QUALITY.antialias, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(QUALITY.pixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.autoUpdate = false;
+    this.container.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 5000);
+    camera.layers.enable(LAYER_DETAIL);
+
+    const ctx = this.ctx = {
+      renderer, scene, camera,
+      mask: new OccupancyMask(),
+      pickables: [], nightMaterials: [], wetMaterials: [], animators: [],
+      uniforms: {
+        uTime: { value: 0 }, uRain: { value: 0 }, uDaylight: { value: 1 }, uSunset: { value: 0 }, uNight: { value: 0 },
+        uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uMoonDir: { value: new THREE.Vector3(0, -1, 0) },
+        uSunColor: { value: new THREE.Vector3(1, 1, 1) }, uAmbient: { value: new THREE.Vector3(0.3, 0.35, 0.4) },
+        uSimTex: { value: null }, uSimBounds: { value: new THREE.Vector4(0, 0, 1, 1) },
+        uWaterTint: { value: new THREE.Vector3(0.5, 0.8, 0.9) },
+      },
+    };
+
+    ui.progress(0.12, '生成岛屿地形…'); await nextFrame();
+    this.terrain = new Terrain(ctx);
+    ui.progress(0.25, '模拟海水…'); await nextFrame();
+    this.water = new Water(ctx, this.terrain);
+    this.sky = new Sky(ctx);
+    this.env = new Environment(ctx, this.sky);
+
+    ui.progress(0.35, '架设桥梁…'); await nextFrame();
+    this.bridges = new Bridges(ctx, this.terrain);
+    this.terrain.bridges = this.bridges;
+    ui.progress(0.45, '规划道路…'); await nextFrame();
+    this.roads = new RoadNetwork(ctx, this.terrain, this.bridges.connectorRoads());
+    ui.progress(0.55, '建造城市…'); await nextFrame();
+    this.city = new City(ctx, this.terrain);
+    this.furniture = new StreetFurniture(ctx, [...this.roads.lamps, ...this.bridges.lamps], this.roads.signals);
+
+    ui.progress(0.68, '种植草地与树木…'); await nextFrame();
+    this.ground = new GroundMap(this.terrain, ctx.mask, IS_MOBILE ? 768 : 1024);
+    this.grass = new Grass(ctx, this.ground);
+    this.trees = new Trees(ctx, this.terrain, this.ground, ctx.mask, [...this.city.treeSpots, ...this.roads.streetTrees]);
+    ui.progress(0.82, '小动物入住…'); await nextFrame();
+    this.animals = new Animals(ctx, this.terrain, this.ground, ctx.mask, this.water);
+
+    this.controls = new CameraControls(camera, renderer.domElement, {
+      groundHeight: (x, z) => {
+        const b = this.bridges.heightAt(x, z);
+        return Math.max(this.terrain.heightAt(x, z), b === null ? -Infinity : b, 0);
+      },
+      walkable: (x, z) => (this.terrain.heightAt(x, z) > 0.6 || this.bridges.heightAt(x, z) !== null)
+        && this.ctx.mask.hit(x, z, 2, 'building') === null,
+    });
+    this.controls.target.set(10, 8, -10);
+    this.controls.goalTarget.copy(this.controls.target);
+    this.controls.radius = 520; this.controls.goalRadius = 230;
+    this.controls.theta = 0.2; this.controls.goalTheta = 0.65;
+    this.controls.phi = 0.55; this.controls.goalPhi = 1.08;
+
+    this.interaction = new Interaction(ctx, { terrain: this.terrain, bridges: this.bridges, water: this.water, controls: this.controls, ui });
+    this._labelsAndPlaces();
+
+    ui.progress(0.92, '编译着色器…'); await nextFrame();
+    this.env.apply(0, true, camera, this.controls.focus);
+    this.controls.update(0);
+    this._resize();
+    window.addEventListener('resize', () => this._resize());
+    this.clock = new THREE.Clock();
+    this.time = 0;
+    this._frame();
+    ui.bind(this);
+    ui.progress(1, '欢迎来到南瓜岛');
+    await nextFrame();
+    ui.done();
+  }
+
+  _labelsAndPlaces() {
+    const it = this.interaction;
+    const places = [];
+    for (const b of this.city.buildings) {
+      const info = b.info;
+      if (!info.landmark) continue;
+      const top = new THREE.Vector3(b.object.position.x, b.object.position.y + info.height + 3, b.object.position.z);
+      it.addLabel(info.name, info.nameEn, top, info.featured ? 'featured' : 'minor');
+      places.push({ name: info.name, tag: info.category.split(' ')[0], info });
+    }
+    for (const isl of this.terrain.islands) {
+      const h = Math.max(this.terrain.heightAt(isl.x, isl.z), 2);
+      const pos = isl.id === 'central' ? new THREE.Vector3(isl.x - 80, 14, isl.z + 80) : new THREE.Vector3(isl.x, h + 16, isl.z);
+      it.addLabel(isl.name, isl.nameEn, pos, 'island');
+      places.push({ name: isl.name, tag: '岛屿', info: {
+        name: isl.name, nameEn: isl.nameEn, category: '岛屿 Island',
+        description: isl.id === 'central' ? '南瓜岛的城市中心：美国大厦、世界遗产博物馆、学校与便利店都在这里。' : '目前以草地、树林和小动物为主，预留未来扩建。',
+        focus: [isl.x, h, isl.z], radius: isl.radius * 2.2,
+      } });
+    }
+    for (const b of this.bridges.items) {
+      const mid = b.point(0.5, 0, 6);
+      it.addLabel(b.cfg.name, '', mid, 'bridge');
+      const info = b.group.userData.pick;
+      places.push({ name: b.cfg.name, tag: '桥梁', info });
+    }
+    this.ui.setPlaces(places, (p) => {
+      it.focusOn(p.info);
+      this.ui.showInfo(p.info, () => it.focusOn(p.info));
+    });
+  }
+
+  _resize() {
+    const w = window.innerWidth, h = window.innerHeight;
+    const { renderer, camera } = this.ctx;
+    renderer.setSize(w, h);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    this.water.setSize(w, h, renderer.getPixelRatio());
+  }
+
+  _frame() {
+    requestAnimationFrame(() => this._frame());
+    const dt = Math.min(this.clock.getDelta(), 0.1);
+    this.time += dt;
+    const { ctx } = this;
+    const u = ctx.uniforms;
+    u.uTime.value = this.time;
+
+    this.controls.update(dt);
+    if (this.interaction.followTarget && this.controls.mode === 'orbit' && !this.controls.anim) {
+      this.controls.goalTarget.lerp(this.interaction.followTarget.position, Math.min(1, dt * 2));
+    }
+    const focus = this.controls.focus;
+    this.env.update(dt, ctx.camera, focus);
+    this.ui.syncTime?.();
+    this._updateShadowFrustum();
+    this.env.feedRain(this.water, focus);
+    this.grass.update(ctx.camera);
+    this.animals.update(dt, this.time);
+    const night = u.uNight.value;
+    this.furniture.update(this.time, night, focus);
+    for (const n of ctx.nightMaterials) {
+      let v = (n.base || 0) + (n.always ? n.intensity : night * n.intensity);
+      if (n.blink) v *= Math.sin(this.time * 3.2) > 0.2 ? 1 : 0.04;
+      n.material.emissiveIntensity = v;
+    }
+    const rain = u.uRain.value;
+    for (const w of ctx.wetMaterials) w.material.roughness = lerp(w.dry, w.wet, rain);
+    for (const fn of ctx.animators) fn(this.time);
+
+    this.water.update(dt);
+    this.water.renderPasses(ctx.scene, ctx.camera, this.sky.mesh);
+    this.sky.follow(ctx.camera);
+    // Shadows are rendered in the main pass only: global clip planes from the water passes would cut the shadow map.
+    ctx.renderer.shadowMap.needsUpdate = true;
+    ctx.renderer.render(ctx.scene, ctx.camera);
+    this.interaction.update(this.time);
+  }
+
+  _updateShadowFrustum() {
+    const cam = this.env.sun.shadow.camera;
+    const r = this.controls.mode === 'orbit' ? this.controls.radius : 40 + this.controls.flyHeight;
+    const ext = clamp(r * 0.75, 45, 190);
+    if (Math.abs(cam.right - ext) > 2) {
+      cam.left = -ext; cam.right = ext; cam.top = ext; cam.bottom = -ext;
+      cam.updateProjectionMatrix();
+    }
+  }
+}
