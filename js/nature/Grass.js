@@ -68,6 +68,7 @@ export class Grass {
       uTerrainSize: { value: groundMap.size },
       uTime: ctx.uniforms.uTime,
       uRain: ctx.uniforms.uRain,
+      uStorm: ctx.uniforms.uStorm,
     };
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     mat.onBeforeCompile = (shader) => {
@@ -77,7 +78,7 @@ export class Grass {
           attribute vec3 aOffset;
           uniform vec3 uCenter; uniform float uSize; uniform float uRadius;
           uniform sampler2D uGround; uniform float uGroundRes; uniform float uTerrainSize;
-          uniform float uTime; uniform float uRain;
+          uniform float uTime; uniform float uRain; uniform float uStorm;
           vec2 groundTexel(vec2 ij) {
             return texture2D(uGround, (ij + 0.5) / uGroundRes).rg;
           }
@@ -102,9 +103,10 @@ export class Grass {
           transformed *= scl;
           float hgt = position.y;
           float gust = sin(uTime * 1.7 + wp.x * 0.31 + wp.y * 0.23) * 0.6 + sin(uTime * 3.3 + wp.x * 0.9 - wp.y * 0.4) * 0.25;
-          float windAmt = (0.35 + uRain * 0.5) * hgt * hgt;
+          float windAmt = (0.35 + uRain * 0.5 + uStorm * 1.6) * hgt * hgt;
           transformed.x += gust * windAmt;
           transformed.z += gust * windAmt * 0.45;
+          transformed.x += uStorm * 0.9 * hgt * hgt;
           transformed.xz += wp;
           transformed.y += gs.x - 0.03;`)
         .replace('#include <color_vertex>', `#include <color_vertex>
