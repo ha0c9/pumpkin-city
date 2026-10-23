@@ -262,21 +262,29 @@ export class Trees {
     for (const s of fixedSpots) placements.broadleaf.push({ x: s.x, y: s.y - 0.3, z: s.z, s: 0.72 + rng() * 0.18 });
 
     // Natural placement: forests are clumped by low-frequency noise.
+    const areas = terrain.islands.map((i) => (i.landBox[2] - i.landBox[0]) * (i.landBox[3] - i.landBox[1]));
+    const areaSum = areas.reduce((a, b) => a + b, 0);
+    const pickIsland = () => {
+      let r = rng() * areaSum;
+      for (let i = 0; i < areas.length; i++) { r -= areas[i]; if (r <= 0) return terrain.islands[i]; }
+      return terrain.islands[0];
+    };
+    const inDowntown = (x, z) => x > -165 && x < 165 && z > -145 && z < 145;
     let attempts = 0;
     let placed = 0;
     while (placed < total && attempts < total * 30) {
       attempts++;
-      const isl = terrain.islands[Math.floor(rng() * terrain.islands.length)];
-      const a = rng() * Math.PI * 2, r = Math.sqrt(rng()) * isl.radius * 1.05;
-      const x = isl.x + Math.cos(a) * r, z = isl.z + Math.sin(a) * r;
+      const isl = pickIsland();
+      const b = isl.landBox;
+      const x = b[0] + rng() * (b[2] - b[0]), z = b[1] + rng() * (b[3] - b[1]);
       const h = groundMap.heightAt(x, z);
       if (h < 0.9) continue;
-      if (!mask.isFree(x, z, 2.5)) continue;
-      const city = isl.id === 'central' && Math.abs(x) < 72 && Math.abs(z) < 72;
+      if (!mask.isFree(x, z, 2.5) || mask.hit(x, z, 9, 'building') !== null) continue;
+      const city = inDowntown(x, z);
       const forest = fbm(x / 60, z / 60, 3, 4) * 0.5 + 0.5;
-      const t = Math.hypot(x - isl.x, z - isl.z) / isl.radius;
+      const coast = terrain.coastDistance(x, z);
       let type;
-      if (h < 1.9 && t > 0.72) {
+      if (h < 1.9 && coast > -16) {
         if (rng() > 0.35) continue;
         type = 'palm';
       } else if (h < 1.25) {
@@ -292,14 +300,14 @@ export class Trees {
       placed++;
     }
     // Shore rocks.
-    for (let i = 0; i < 160; i++) {
-      const isl = terrain.islands[Math.floor(rng() * terrain.islands.length)];
-      const a = rng() * Math.PI * 2;
-      for (let r = isl.radius * 0.8; r < isl.radius * 1.2; r += 0.5) {
-        const x = isl.x + Math.cos(a) * r, z = isl.z + Math.sin(a) * r;
-        const h = terrain.heightAt(x, z);
-        if (h < 0.35 + rng() * 0.6 && mask.isFree(x, z, 2)) { placements.rock.push({ x, y: h - 0.2, z, s: 0.5 + rng() * 1.4 }); break; }
-      }
+    for (let i = 0, tries = 0; i < 260 && tries < 40000; tries++) {
+      const isl = pickIsland();
+      const b = isl.landBox;
+      const x = b[0] - 10 + rng() * (b[2] - b[0] + 20), z = b[1] - 10 + rng() * (b[3] - b[1] + 20);
+      const h = terrain.heightAt(x, z);
+      if (h > 0.9 || h < -0.6 || !mask.isFree(x, z, 2)) continue;
+      placements.rock.push({ x, y: h - 0.2, z, s: 0.5 + rng() * 1.4 });
+      i++;
     }
 
     this.meshes = [];
