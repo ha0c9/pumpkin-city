@@ -310,6 +310,10 @@ export class Water {
       uExposure: { value: 1 }, uSwell: { value: 1 }, uWaveSlope: { value: 0.32 }, uWind: { value: 1 },
     }]);
     this.uniforms.uWaveTex.value = bakeWaveTexture(256);
+    // UniformsUtils.merge clones textures; render-target textures must be the original objects.
+    this.uniforms.uReflTex.value = this.reflRT.texture;
+    this.uniforms.uRefrTex.value = this.refrRT.texture;
+    this.uniforms.uDepthTex.value = terrain.depthTexture;
     // Share live uniforms with the rest of the world.
     this.uniforms.uTime = u.uTime;
     this.uniforms.uRain = u.uRain;
