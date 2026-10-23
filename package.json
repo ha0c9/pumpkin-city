@@ -1,0 +1,10 @@
+{
+  "name": "pumpkin-island",
+  "private": true,
+  "type": "module",
+  "description": "Pumpkin Island 南瓜岛 — static Three.js r128 site, no build step.",
+  "scripts": {
+    "check-layout": "node tools/check-layout.mjs layout-map.png",
+    "serve": "python3 -m http.server 8080"
+  }
+}

@@ -1,6 +1,8 @@
-// Procedural islands: height function, terrain mesh with caustics, and a baked seabed depth texture.
-import { ISLANDS, TERRAIN, WATER, QUALITY } from '../config/world.config.js';
-import { fbm, lerp, smoothstep, clamp } from '../core/Utils.js';
+// Procedural islands: terrain mesh with caustics and a baked seabed depth texture.
+// Heights come from IslandField (pure math, also used by tools/check-layout.mjs).
+import { ISLANDS, TERRAIN, WATER, QUALITY, CITY_GROUND } from '../config/world.config.js';
+import { fbm, smoothstep, clamp } from '../core/Utils.js';
+import { IslandField } from './IslandField.js';
 
 const THREE = window.THREE;
 
@@ -38,62 +40,28 @@ float vnoise(vec2 p) {
 export class Terrain {
   constructor(ctx) {
     this.ctx = ctx;
-    this.islands = ISLANDS.map((isl) => ({ ...isl, bound: isl.radius * 1.9 }));
+    this.field = new IslandField(ISLANDS, { ...TERRAIN, plateau: CITY_GROUND });
+    this.islands = this.field.islands;
     this.size = TERRAIN.size;
     this.mesh = this._buildMesh();
-    this.depthTexture = this._bakeDepthTexture(768);
-    ctx.scene.add(this.mesh);
+    this.seabedMesh = this._buildSeabed();
+    this.depthTexture = this._bakeDepthTexture(1024);
+    ctx.scene.add(this.mesh, this.seabedMesh);
   }
 
   islandById(id) { return this.islands.find((i) => i.id === id); }
+  heightAt(x, z) { return this.field.heightAt(x, z); }
+  islandAt(x, z) { return this.field.islandAt(x, z, 6); }
+  coastDistance(x, z) { return this.field.coastDistance(x, z); }
 
-  _islandHeight(isl, x, z) {
-    const dx = x - isl.x, dz = z - isl.z;
-    const d = Math.sqrt(dx * dx + dz * dz);
-    if (d > isl.bound) return -Infinity;
-    const ang = Math.atan2(dz, dx);
-    const shapeR = isl.radius * (1 + isl.shape * fbm(Math.cos(ang) * 1.6 + isl.seed, Math.sin(ang) * 1.6, 3, isl.seed));
-    const t = d / shapeR;
-    const H = isl.height;
-    let h;
-    if (t <= isl.flat) {
-      h = H;
-    } else if (t <= 1.0) {
-      const k = (t - isl.flat) / (1 - isl.flat);
-      h = lerp(H, 0.3, smoothstep(0, 1, k));
-      h += fbm(x * 0.15, z * 0.15, 2, isl.seed + 5) * 0.12 * (1 - k);
-    } else if (t <= 1.13) {
-      h = lerp(0.3, -1.7, (t - 1.0) / 0.13);
-    } else {
-      h = lerp(-1.7, TERRAIN.seabed, smoothstep(1.13, 1.8, t));
+  /** Uniform random land point on an island (rejection sampled). */
+  randomPointOn(isl, rng, minHeight = 1.25) {
+    const b = isl.landBox;
+    for (let k = 0; k < 200; k++) {
+      const x = b[0] + rng() * (b[2] - b[0]), z = b[1] + rng() * (b[3] - b[1]);
+      if (this.heightAt(x, z) >= minHeight && this.field.islandAt(x, z) === isl) return { x, z };
     }
-    if (isl.hills > 0) {
-      const mask = smoothstep(0.62, 0.25, t);
-      if (mask > 0) {
-        const n = fbm(x / 45 + isl.seed, z / 45, 4, isl.seed) * 0.5 + 0.5;
-        h += Math.pow(n, 1.6) * isl.hills * mask;
-      }
-    }
-    return h;
-  }
-
-  heightAt(x, z) {
-    let h = TERRAIN.seabed + fbm(x * 0.01, z * 0.01, 2, 99) * 2.5;
-    for (const isl of this.islands) {
-      const ih = this._islandHeight(isl, x, z);
-      if (ih > h) h = ih;
-    }
-    return h;
-  }
-
-  /** Returns the island that contains (x, z) or null. */
-  islandAt(x, z) {
-    let best = null, bestH = 0;
-    for (const isl of this.islands) {
-      const h = this._islandHeight(isl, x, z);
-      if (h > bestH) { bestH = h; best = isl; }
-    }
-    return best;
+    return { x: isl.x, z: isl.z };
   }
 
   surfaceAt(x, z) {
@@ -112,50 +80,90 @@ export class Terrain {
     return Math.sqrt(hx * hx + hz * hz) / (2 * e);
   }
 
+  /** Grid mesh over the islands' bounds; deep open-sea cells are skipped (the seabed mesh covers them). */
   _buildMesh() {
-    const seg = QUALITY.terrainSegments;
-    const geo = new THREE.PlaneGeometry(this.size, this.size, seg, seg);
-    geo.rotateX(-Math.PI / 2);
-    const pos = geo.attributes.position;
-    const colors = new Float32Array(pos.count * 3);
+    const cell = QUALITY.terrainCell;
+    const [minX, minZ, maxX, maxZ] = this.field.bounds;
+    const nx = Math.ceil((maxX - minX) / cell) + 1, nz = Math.ceil((maxZ - minZ) / cell) + 1;
+    const count = nx * nz;
+    const pos = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    const keep = new Uint8Array(count);
     const sand = new THREE.Color(0xd9c49a), wetSand = new THREE.Color(0xb79f74), seabed = new THREE.Color(0xc9b98f);
     const grassA = new THREE.Color(0x4f7a2c), grassB = new THREE.Color(0x6f9a3a), grassC = new THREE.Color(0x3c6424);
     const rock = new THREE.Color(0x7d7468), deep = new THREE.Color(0x8a8a78);
-    const rockLinear = rock.clone().convertSRGBToLinear();
     const c = new THREE.Color();
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i), z = pos.getZ(i);
-      const h = this.heightAt(x, z);
-      pos.setY(i, h);
-      const n = fbm(x * 0.03, z * 0.03, 3, 7) * 0.5 + 0.5;
-      const n2 = fbm(x * 0.11, z * 0.11, 2, 8) * 0.5 + 0.5;
-      if (h < -0.2) {
-        c.copy(seabed).lerp(deep, smoothstep(-2, -14, h));
-      } else if (h < 0.55) {
-        c.copy(wetSand).lerp(sand, smoothstep(-0.2, 0.55, h));
-      } else if (h < 1.2) {
-        c.copy(sand).lerp(grassB, smoothstep(0.95, 1.2, h) * 0.6);
-      } else {
-        c.copy(grassA).lerp(grassB, n).lerp(grassC, n2 * 0.45);
-        if (h > 9) c.lerp(rock, smoothstep(9, 18, h) * 0.6);
+    for (let j = 0; j < nz; j++) {
+      for (let i = 0; i < nx; i++) {
+        const k = j * nx + i;
+        const x = minX + i * cell, z = minZ + j * cell;
+        const h = this.heightAt(x, z);
+        pos[k * 3] = x; pos[k * 3 + 1] = h; pos[k * 3 + 2] = z;
+        keep[k] = this.field.influencedAt(x, z) ? 1 : 0;
+        const n = fbm(x * 0.03, z * 0.03, 3, 7) * 0.5 + 0.5;
+        const n2 = fbm(x * 0.11, z * 0.11, 2, 8) * 0.5 + 0.5;
+        if (h < -0.2) c.copy(seabed).lerp(deep, smoothstep(-2, -14, h));
+        else if (h < 0.55) c.copy(wetSand).lerp(sand, smoothstep(-0.2, 0.55, h));
+        else if (h < 1.2) c.copy(sand).lerp(grassB, smoothstep(0.95, 1.2, h) * 0.6);
+        else {
+          c.copy(grassA).lerp(grassB, n).lerp(grassC, n2 * 0.45);
+          if (h > 9) c.lerp(rock, smoothstep(9, 22, h) * 0.55);
+        }
+        c.convertSRGBToLinear();
+        colors[k * 3] = c.r; colors[k * 3 + 1] = c.g; colors[k * 3 + 2] = c.b;
       }
-      c.convertSRGBToLinear();
-      colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
     }
+    const index = [];
+    for (let j = 0; j < nz - 1; j++) {
+      for (let i = 0; i < nx - 1; i++) {
+        const a = j * nx + i, b = a + 1, d = a + nx, e = d + 1;
+        if (!(keep[a] | keep[b] | keep[d] | keep[e])) continue;
+        index.push(a, d, b, b, d, e);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geo.setIndex(count > 65535 ? new THREE.Uint32BufferAttribute(index, 1) : new THREE.Uint16BufferAttribute(index, 1));
     geo.computeVertexNormals();
     // Steep slopes become rock.
     const nor = geo.attributes.normal;
-    for (let i = 0; i < pos.count; i++) {
-      const ny = nor.getY(i);
-      if (ny < 0.86 && pos.getY(i) > 1) {
-        const k = smoothstep(0.86, 0.7, ny);
-        c.setRGB(colors[i * 3], colors[i * 3 + 1], colors[i * 3 + 2]).lerp(rockLinear, k);
-        colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+    const rockLinear = rock.clone().convertSRGBToLinear();
+    for (let k = 0; k < count; k++) {
+      const ny = nor.getY(k);
+      if (ny < 0.86 && pos[k * 3 + 1] > 1) {
+        c.setRGB(colors[k * 3], colors[k * 3 + 1], colors[k * 3 + 2]).lerp(rockLinear, smoothstep(0.86, 0.7, ny));
+        colors[k * 3] = c.r; colors[k * 3 + 1] = c.g; colors[k * 3 + 2] = c.b;
       }
     }
+    geo.computeBoundingSphere();
 
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.93, metalness: 0 });
+    this._patchMaterial(mat);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.receiveShadow = true;
+    mesh.name = 'terrain';
+    mesh.userData.isTerrain = true;
+    return mesh;
+  }
+
+  /** Coarse open-sea floor that sits slightly below the detailed mesh. */
+  _buildSeabed() {
+    const S = this.size * 4;
+    const geo = new THREE.PlaneGeometry(S, S, 96, 96);
+    geo.rotateX(-Math.PI / 2);
+    const p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) p.setY(i, this.field.seabedAt(p.getX(i), p.getZ(i)) - 0.6);
+    geo.computeVertexNormals();
+    const col = new THREE.Color(0x8a8a78).convertSRGBToLinear();
+    const mat = new THREE.MeshStandardMaterial({ color: col, roughness: 1 });
+    this._patchMaterial(mat);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = 'seabed';
+    return mesh;
+  }
+
+  _patchMaterial(mat) {
     const u = this.ctx.uniforms;
     mat.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = u.uTime;
@@ -199,11 +207,6 @@ export class Terrain {
             totalEmissiveRadiance += diffuseColor.rgb * vec3(0.75, 0.95, 1.0) * caustic * fade * 0.9;
           }`);
     };
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.receiveShadow = true;
-    mesh.name = 'terrain';
-    mesh.userData.isTerrain = true;
-    return mesh;
   }
 
   /** R = normalized water depth, G = land mask. Covers the full terrain extent. */
