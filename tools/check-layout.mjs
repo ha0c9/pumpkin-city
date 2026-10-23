@@ -5,6 +5,7 @@ import { deflateSync } from 'zlib';
 import { ISLANDS, TERRAIN, CITY_GROUND } from '../js/config/world.config.js';
 import { ROADS, ROAD_STYLE, BRIDGES, LANDMARKS, LOTS } from '../js/config/city.layout.js';
 import { IslandField } from '../js/world/IslandField.js';
+import { BridgePath } from '../js/world/BridgePath.js';
 
 // Keep in sync with the building modules' `footprint`.
 const FOOTPRINTS = {
@@ -19,7 +20,8 @@ const field = new IslandField(ISLANDS, { ...TERRAIN, plateau: CITY_GROUND });
 console.log(`height grid ${field.n}x${field.n} baked in ${Date.now() - t0} ms`);
 
 const errors = [];
-const flat = (x, z) => Math.abs(field.rawHeight(x, z) - CITY_GROUND) < 0.03;
+const groundAt = (x, z) => { const isl = field.islandAt(x, z); return isl ? isl.height : CITY_GROUND; };
+const flat = (x, z) => Math.abs(field.rawHeight(x, z) - groundAt(x, z)) < 0.03;
 const halfTotal = (lanes) => (lanes * ROAD_STYLE.laneWidth) / 2 + ROAD_STYLE.sidewalk;
 
 function rectCorners(cx, cz, w, d, rot) {
@@ -78,26 +80,26 @@ LOTS.small.forEach((l, i) => {
   checkRect(`small lot #${i}`, l.position[0], l.position[1], swap ? l.size[1] : l.size[0], swap ? l.size[0] : l.size[1], 0);
 });
 
-// Bridges: same marching as js/world/Bridges.js.
+// Bridges: same curve as js/world/Bridges.js.
 const bridges = BRIDGES.map((b) => {
-  const D = [b.dir[0], b.dir[1]];
-  const hStart = field.heightAt(b.from[0], b.from[1]);
-  let tA = 0, tB = 0;
-  let lastFlat = 0;
-  for (let t = 0; t < 600; t += 0.5) {
-    const h = field.heightAt(b.from[0] + D[0] * t, b.from[1] + D[1] * t);
-    if (h >= hStart - 0.03) lastFlat = t;
-    if (h < 0) { tA = Math.max(0, lastFlat - 1.5); break; }
+  const path = new BridgePath(b, field);
+  if (!path.ok) { errors.push(`bridge ${b.id} never reaches the water`); return { b, path }; }
+  const endIsland = field.islandAt(...b.end);
+  if (!endIsland || endIsland.id !== b.to) errors.push(`bridge ${b.id} end ${b.end} is not on ${b.to}`);
+  let maxGrade = 0, minClear = Infinity;
+  const n = Math.ceil(path.length / 2);
+  for (let i = 0; i < n; i++) {
+    const s0 = i / n, s1 = (i + 1) / n;
+    maxGrade = Math.max(maxGrade, Math.abs(path.deckY(s1) - path.deckY(s0)) / (path.length / n));
+    if (s0 > 0.06 && s0 < 0.94) {
+      const c = path.at(s0);
+      minClear = Math.min(minClear, path.deckY(s0) - field.heightAt(c.x, c.z));
+    }
   }
-  for (let t = tA + 5; t < 800; t += 0.5) {
-    const x = b.from[0] + D[0] * t, z = b.from[1] + D[1] * t;
-    const isl = field.islandAt(x, z);
-    if (isl && isl.id === b.to && field.heightAt(x, z) >= CITY_GROUND - 0.03) { tB = t + 1.5; break; }
-  }
-  const A = [b.from[0] + D[0] * tA, b.from[1] + D[1] * tA], B = [b.from[0] + D[0] * tB, b.from[1] + D[1] * tB];
-  console.log(`bridge ${b.id}: A=${A.map((v) => v.toFixed(0))} B=${B.map((v) => v.toFixed(0))} length ${(tB - tA).toFixed(0)} m`);
-  if (!tB) errors.push(`bridge ${b.id} never reaches ${b.to}`);
-  return { b, A, B };
+  console.log(`bridge ${b.id}: A=${path.A.map((v) => v.toFixed(0))} (h ${path.hA.toFixed(1)}) B=${path.B.map((v) => v.toFixed(0))} (h ${path.hB.toFixed(1)}) length ${path.length.toFixed(0)} m, max grade ${(maxGrade * 100).toFixed(1)}%, min clearance ${minClear.toFixed(1)} m`);
+  if (maxGrade > 0.08) errors.push(`bridge ${b.id} is too steep (${(maxGrade * 100).toFixed(1)}%)`);
+  if (minClear < 0.2) errors.push(`bridge ${b.id} deck cuts into land (clearance ${minClear.toFixed(1)} m)`);
+  return { b, path };
 });
 
 // --- Map ---
@@ -116,8 +118,8 @@ for (let py = 0; py < S; py++) {
     let c;
     if (h < 0) { const k = Math.min(1, -h / 16); c = [30 + 40 * (1 - k), 120 + 90 * (1 - k), 170 + 50 * (1 - k)]; }
     else if (h < 1.15) c = [220, 200, 150];
-    else if (h <= CITY_GROUND + 0.02) c = [90, 150, 70];
-    else { const k = Math.min(1, (h - CITY_GROUND) / 20); c = [90 + 90 * k, 150 - 20 * k, 70 + 50 * k]; }
+    else if (h <= groundAt(x, z) + 0.02) c = [100 - h * 3, 160 - h * 4, 70 - h * 2];
+    else { const k = Math.min(1, (h - groundAt(x, z)) / 20); c = [90 + 90 * k, 150 - 20 * k, 70 + 50 * k]; }
     put(px, py, c);
   }
 }
@@ -129,10 +131,17 @@ const fillRect = (cx, cz, w, d, rot, rgb) => {
   }
 };
 for (const rr of roadRects) fillRect((rr.x0 + rr.x1) / 2, (rr.z0 + rr.z1) / 2, rr.x1 - rr.x0, rr.z1 - rr.z0, 0, [70, 70, 75]);
-for (const { A, B, b } of bridges) {
+for (const { b, path } of bridges) {
+  if (!path.ok) continue;
   const w = (b.lanes || 2) * ROAD_STYLE.laneWidth + 2 * ROAD_STYLE.sidewalk;
-  fillRect((A[0] + B[0]) / 2, (A[1] + B[1]) / 2, Math.abs(B[0] - A[0]) || w, Math.abs(B[1] - A[1]) || w, 0, [200, 200, 205]);
-  fillRect((A[0] + b.from[0]) / 2, (A[1] + b.from[1]) / 2, Math.abs(A[0] - b.from[0]) || w, Math.abs(A[1] - b.from[1]) || w, 0, [70, 70, 75]);
+  const n = Math.ceil(path.length / 2);
+  for (let i = 0; i < n; i++) {
+    const c = path.at((i + 0.5) / n);
+    fillRect(c.x, c.z, path.length / n + 1, w, Math.atan2(-c.tz, c.tx), [200, 200, 205]);
+  }
+  for (const [p, q] of [[b.from, path.A], [path.B, b.end]]) {
+    fillRect((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, Math.abs(p[0] - q[0]) || w, Math.abs(p[1] - q[1]) || w, 0, [70, 70, 75]);
+  }
 }
 for (const p of placed) {
   const col = p.label.startsWith('landmark') ? [230, 120, 30] : p.label.startsWith('large') ? [150, 90, 200] : [240, 220, 60];

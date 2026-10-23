@@ -107,7 +107,7 @@ export class Terrain {
         else if (h < 1.2) c.copy(sand).lerp(grassB, smoothstep(0.95, 1.2, h) * 0.6);
         else {
           c.copy(grassA).lerp(grassB, n).lerp(grassC, n2 * 0.45);
-          if (h > 9) c.lerp(rock, smoothstep(9, 22, h) * 0.55);
+          if (h > 16) c.lerp(rock, smoothstep(16, 30, h) * 0.55);
         }
         c.convertSRGBToLinear();
         colors[k * 3] = c.r; colors[k * 3 + 1] = c.g; colors[k * 3 + 2] = c.b;

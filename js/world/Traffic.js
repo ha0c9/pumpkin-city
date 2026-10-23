@@ -112,10 +112,11 @@ export class Traffic {
     for (const b of bridges.items) {
       const NA = near(b.A.x, b.A.y), NB = near(b.B.x, b.B.y);
       if (!NA || !NB) continue;
-      const D = new THREE.Vector3(b.D.x, 0, b.D.y);
+      const DA = new THREE.Vector3(b.D.x, 0, b.D.y), DB = new THREE.Vector3(b.DB.x, 0, b.DB.y);
       for (const [P, Q, fwd] of [[NA, NB, true], [NB, NA, false]]) {
-        const d = fwd ? D.clone() : D.clone().negate();
-        const e = { from: P, to: Q, dir: d, endDir: d, axis: null, lanes: b.lanes, len: b.L, bridge: b, fwd };
+        const d = fwd ? DA.clone() : DB.clone().negate();
+        const endDir = fwd ? DB.clone() : DA.clone().negate();
+        const e = { from: P, to: Q, dir: d, endDir, axis: null, lanes: b.lanes, len: b.L, bridge: b, fwd };
         edges.push(e);
         out.get(P).push(e);
       }

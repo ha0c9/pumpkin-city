@@ -210,7 +210,7 @@ export class RoadNetwork {
             const p = this._place(r, t, side * (r.width / 2 + 0.45), ch);
             const dir = r.axis === 'x' ? [0, -side] : [-side, 0];
             this.lamps.push({ x: p.x, y: p.y, z: p.z, dirX: dir[0], dirZ: dir[1] });
-            if (r.endMin !== 'bridge' && r.endMax !== 'bridge' && r.y < 2.1) {
+            if (r.endMin !== 'bridge' && r.endMax !== 'bridge') {
               for (const ts of [-1, 1]) {
                 const tt = t + step * 0.25 * (ts === side ? 1 : -1);
                 if (tt < t0 + 3 || tt > t1 - 3) continue;

@@ -1,10 +1,10 @@
 // Global world settings. Tweak islands, colors and render quality here.
 
 export const SEA_LEVEL = 0;
-export const CITY_GROUND = 2.0; // plateau height shared by every island (roads and lots are flat)
+export const CITY_GROUND = 2.0; // default plateau height; each island can set its own `ground` (roads and lots are flat)
 
 export const TERRAIN = {
-  size: 1600,         // world units (meters), centered on origin; islands must stay inside
+  size: 1800,         // world units (meters), centered on origin; islands must stay inside
   seabed: -18,        // open-sea floor depth
   shore: 22,          // meters from the coastline inland until the plateau height is reached
   heightCell: 1.5,    // resolution of the baked height grid used by everything that queries the ground
@@ -13,38 +13,39 @@ export const TERRAIN = {
 /**
  * Islands are a smooth union of circles ("blobs": [x, z, radius]) with a noisy coastline,
  * which gives irregular bays and headlands. `coast` is the coastline noise amplitude in meters.
+ * `ground` is the island's plateau height (roads, lots and bridge ends sit on it).
  * `hills`: [x, z, radius, height] bumps, kept away from the shore. Roads/lots must avoid hills.
  * (x, z) is the label / focus point of the island.
  */
 export const ISLANDS = [
   {
-    id: 'central', name: '南瓜中心岛', nameEn: 'Pumpkin Central', x: -10, z: 10, seed: 11, coast: 22,
+    id: 'central', name: '南瓜中心岛', nameEn: 'Pumpkin Central', x: -10, z: 10, seed: 11, coast: 22, ground: 2,
     blobs: [[0, 0, 178], [120, -95, 92], [-128, 92, 92], [100, 118, 82], [-125, -108, 80], [205, 8, 62], [150, 62, 62], [-212, -6, 58], [8, 188, 58], [-8, -196, 56]],
     hills: [],
   },
   {
-    id: 'east', name: '东林岛', nameEn: 'East Grove', x: 470, z: 10, seed: 23, coast: 26,
-    blobs: [[440, 15, 118], [520, -60, 80], [520, 90, 78], [400, 105, 66], [395, -85, 60], [610, 30, 40], [470, 150, 42]],
-    hills: [[568, -52, 62, 16], [560, 70, 55, 11], [600, 10, 40, 8]],
+    id: 'east', name: '东林岛', nameEn: 'East Grove', x: 510, z: 55, seed: 23, coast: 26, ground: 5.5,
+    blobs: [[480, 60, 118], [560, -15, 80], [560, 135, 78], [440, 150, 66], [435, -40, 60], [650, 75, 40], [510, 195, 42]],
+    hills: [[608, -7, 62, 16], [600, 115, 55, 11], [640, 55, 40, 8]],
   },
   {
-    id: 'north', name: '北原岛', nameEn: 'North Meadow', x: 10, z: -470, seed: 37, coast: 24,
-    blobs: [[0, -455, 112], [-90, -500, 72], [95, -490, 70], [10, -560, 62], [-40, -385, 50], [60, -395, 62], [-150, -470, 40], [150, -440, 36]],
-    hills: [[-135, -520, 48, 13], [118, -562, 34, 8]],
+    id: 'north', name: '北原岛', nameEn: 'North Meadow', x: -50, z: -520, seed: 37, coast: 24, ground: 10,
+    blobs: [[-60, -505, 112], [-150, -550, 72], [35, -540, 70], [-50, -610, 62], [-100, -435, 50], [0, -445, 62], [-210, -520, 40], [90, -490, 36]],
+    hills: [[-195, -570, 48, 13], [58, -612, 34, 8]],
   },
   {
-    id: 'west', name: '西岭岛', nameEn: 'West Ridge', x: -480, z: -10, seed: 41, coast: 26,
-    blobs: [[-450, -5, 116], [-540, -70, 84], [-530, 80, 76], [-395, -95, 70], [-395, 85, 66], [-620, 0, 42], [-470, -140, 40]],
-    hills: [[-560, -60, 70, 24], [-545, 75, 55, 15], [-600, 10, 45, 12]],
+    id: 'west', name: '西岭岛', nameEn: 'West Ridge', x: -530, z: -70, seed: 41, coast: 26, ground: 7,
+    blobs: [[-500, -65, 116], [-590, -130, 84], [-580, 20, 76], [-445, -155, 70], [-445, 25, 66], [-670, -60, 42], [-520, -200, 40], [-428, -85, 66], [-485, -140, 40]],
+    hills: [[-610, -120, 70, 24], [-595, 15, 55, 15], [-650, -50, 45, 12]],
   },
   {
-    id: 'south', name: '南湾岛', nameEn: 'South Cove', x: 40, z: 470, seed: 53, coast: 22,
-    blobs: [[20, 450, 104], [110, 470, 74], [-70, 485, 62], [40, 540, 56], [0, 385, 50], [-50, 410, 52], [175, 430, 34], [-130, 520, 34]],
-    hills: [[-95, 510, 38, 7]],
+    id: 'south', name: '南湾岛', nameEn: 'South Cove', x: 120, z: 510, seed: 53, coast: 22, ground: 3.5,
+    blobs: [[100, 490, 104], [190, 510, 74], [10, 525, 62], [120, 580, 56], [80, 425, 50], [30, 450, 52], [255, 470, 34], [-50, 560, 34]],
+    hills: [[-15, 550, 38, 7]],
   },
   {
-    id: 'pearl', name: '东方明珠岛', nameEn: 'Pearl Isle', x: 470, z: -350, seed: 67, coast: 20,
-    blobs: [[470, -355, 98], [548, -408, 60], [398, -402, 60], [478, -270, 54], [560, -322, 46], [440, -458, 46]],
+    id: 'pearl', name: '东方明珠岛', nameEn: 'Pearl Isle', x: 520, z: -360, seed: 67, coast: 20, ground: 4,
+    blobs: [[520, -365, 98], [598, -418, 60], [448, -412, 60], [528, -280, 54], [610, -332, 46], [490, -468, 46], [555, -440, 55]],
     hills: [],
   },
 ];
