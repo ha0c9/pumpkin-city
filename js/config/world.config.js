@@ -50,7 +50,7 @@ export const ISLANDS = [
 ];
 
 export const WATER = {
-  size: 7000,
+  size: 16000,
   shallowColor: [0.12, 0.80, 0.68],  // turquoise near the beach
   midColor: [0.03, 0.42, 0.62],
   deepColor: [0.010, 0.060, 0.20],   // sapphire offshore

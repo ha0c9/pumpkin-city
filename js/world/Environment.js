@@ -188,6 +188,7 @@ export class Environment {
     fog.lerp(new THREE.Color(0.24, 0.27, 0.3).multiplyScalar(0.2 + 0.8 * daylight), storm * 0.7);
     fog.lerp(new THREE.Color(0.75, 0.8, 0.9), this.flash * 0.5);
     this.ctx.scene.fog.color.copy(fog);
+    this.sky.uniforms.uFogColor.value.copy(fog);
     this.ctx.scene.fog.density = lerp(lerp(0.00055, 0.0032, rain), 0.0034, storm);
 
     this.ctx.renderer.toneMappingExposure = lerp(1.45, 1.0, daylight) + this.flash * 1.3;

@@ -369,6 +369,8 @@ export class Water {
     this.uniforms.uReflTex.value = this.reflRT.texture;
     this.uniforms.uRefrTex.value = this.refrRT.texture;
     this.uniforms.uDepthTex.value = terrain.depthTexture;
+    // Same for the reflection matrix: renderPasses() writes into this.reflMatrix every frame.
+    this.uniforms.uReflMatrix.value = this.reflMatrix;
     // Share live uniforms with the rest of the world.
     this.uniforms.uTime = u.uTime;
     this.uniforms.uRain = u.uRain;
