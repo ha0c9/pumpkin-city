@@ -179,7 +179,7 @@ export class App {
     this.env.update(dt, ctx.camera, focus);
     this.ui.syncTime?.();
     this._updateShadowFrustum();
-    this.water.follow(focus);
+    this.water.follow(focus, ctx.camera);
     this.env.feedRain(this.water, focus);
     this.traffic.update(dt, this.time);
     this.grass.update(ctx.camera);

@@ -1,11 +1,14 @@
 // Water surface: GPU ripples + spectrum-based detail normals + planar reflection + screen-space
-// refraction + depth-based color. The dense mesh and the ripple simulation follow the camera.
+// refraction + depth-based color. The dense mesh follows the camera; the ripple simulation follows the focus.
 import { WATER, WAVES, TERRAIN, QUALITY } from '../config/world.config.js';
 import { RippleSimulation } from './RippleSimulation.js';
 import { NOISE_GLSL } from './Terrain.js';
 import { WaveSpectrum } from './WaveSpectrum.js';
 
 const THREE = window.THREE;
+
+// Fine patch half-extent in meters. The vertex shader's grid fade uses the same value.
+const DETAIL_HALF = 400;
 
 export const LAYER_DETAIL = 1; // grass & rain: skipped in reflection/refraction passes
 
@@ -61,36 +64,40 @@ varying vec3 vWorldPos;
 varying vec2 vBaseXZ;
 varying vec2 vSimUv;
 varying float vSimMask;
-varying float vSwellAmp;
 #include <fog_pars_vertex>
 ${SWELL_GLSL}
 void main() {
   vec4 wp = modelMatrix * vec4(position, 1.0);
   vec2 suv = (wp.xz - uSimBounds.xy) / uSimBounds.zw;
-  vec2 edge = min(suv, 1.0 - suv);
-  float mask = smoothstep(0.0, 0.06, min(edge.x, edge.y));
-  float h = 0.0;
-  if (mask > 0.0) h = texture2D(uSimTex, suv).r * mask;
+  vec2 edgeUv = min(suv, 1.0 - suv);
+  // Wide fade so the simulated patch never ends in a hard line.
+  float mask = smoothstep(0.0, 0.22, min(edgeUv.x, edgeUv.y));
   vec2 duv = wp.xz / uTerrainSize + 0.5;
   float dEnc = (duv.x < 0.0 || duv.y < 0.0 || duv.x > 1.0 || duv.y > 1.0) ? 1.0 : texture2D(uDepthTex, duv).r;
   float depth = dEnc * dEnc * uMaxDepth;
   float amp = uSwell * smoothstep(0.3, 6.0, depth);
+  // Vertex waves exist only near the camera. Past this they would meet the coarse skirt as a
+  // square crease, and that crease jumps when the grid recenters (the flicker on pan / zoom).
+  // The fragment shader evaluates the same swell everywhere, so the falloff stays radial.
+  float camDist = distance(wp.xz, cameraPosition.xz);
+  float dispFade = 1.0 - smoothstep(150.0, 360.0, camDist);
+  float gridEdge = max(abs(position.x), abs(position.z)) / ${DETAIL_HALF.toFixed(1)};
+  dispFade *= 1.0 - smoothstep(0.78, 0.96, gridEdge);
+  float h = 0.0;
+  if (mask > 0.0) h = texture2D(uSimTex, suv).r * mask * dispFade;
   vec2 sl;
-  h += swell(wp.xz, uTime, sl) * amp;
+  h += swell(wp.xz, uTime, sl) * amp * dispFade;
   vBaseXZ = wp.xz;
   if (uStorm > 0.001) {
-    // Only the dense inner grid is displaced; the coarse outer ring keeps the storm in its normals.
-    float edgeFade = 1.0 - smoothstep(0.8, 0.97, max(abs(position.x), abs(position.z)) / ${(WATER.simSize / 2).toFixed(1)});
     float sAmp = uStorm * smoothstep(0.5, 8.0, depth);
     vec3 so = stormWaves(wp.xz, uTime, sl);
-    wp.xz += so.xz * sAmp * edgeFade;
-    h += so.y * sAmp * edgeFade;
+    wp.xz += so.xz * sAmp * dispFade;
+    h += so.y * sAmp * dispFade;
   }
   wp.y += h;
   vWorldPos = wp.xyz;
   vSimUv = suv;
   vSimMask = mask;
-  vSwellAmp = amp;
   vec4 mvPosition = viewMatrix * wp;
   gl_Position = projectionMatrix * mvPosition;
   #include <fog_vertex>
@@ -110,6 +117,7 @@ uniform float uMaxDepth;
 uniform float uTime;
 uniform float uRain;
 uniform float uStorm;
+uniform float uSwell;
 uniform float uDaylight;
 uniform float uExposure;
 uniform float uWaveSlope;
@@ -131,7 +139,6 @@ varying vec3 vWorldPos;
 varying vec2 vBaseXZ;
 varying vec2 vSimUv;
 varying float vSimMask;
-varying float vSwellAmp;
 #include <fog_pars_fragment>
 ${NOISE_GLSL}
 ${SWELL_GLSL}
@@ -216,7 +223,9 @@ void main() {
   // --- Normal: swell + spectrum detail + simulation + rain ---
   vec2 slope;
   swell(vWorldPos.xz, uTime, slope);
-  slope *= vSwellAmp;
+  // Per pixel, not the interpolated vertex amplitude: the outer skirt's triangles are
+  // hundreds of meters wide and would otherwise shade a diagonal seam.
+  slope *= uSwell * smoothstep(0.3, 6.0, depth);
   float stormAmp = uStorm * smoothstep(0.5, 8.0, depth);
   float stormH = 0.0;
   if (stormAmp > 0.001) {
@@ -260,9 +269,10 @@ void main() {
   float path = depth * (1.0 + 1.0 / max(V.y, 0.15));
   // At night the stylized moon/hemi lighting would make the seabed glow turquoise through the shallows.
   vec3 transmit = exp(-uAbsorb * path) * (1.0 - uRain * 0.35) * mix(0.45, 1.0, uDaylight);
-  // The seabed mesh ends at the terrain border: fade the refracted view out well before it.
+  // The depth map ends at the terrain border. A narrow cutoff there reads as a square line
+  // across the bay; fade across a few hundred meters instead.
   vec2 edgeD = abs(duv - 0.5);
-  transmit *= 1.0 - smoothstep(0.36, 0.47, max(edgeD.x, edgeD.y));
+  transmit *= 1.0 - smoothstep(0.28, 0.62, max(edgeD.x, edgeD.y));
   vec3 below = mix(inscatter, refr, transmit);
 
   // --- Reflection (offset along the screen axes; the mirror texture is flipped horizontally) ---
@@ -374,7 +384,8 @@ export class Water {
       fog: true, transparent: true, toneMapped: false,
       extensions: { derivatives: true },
     });
-    this.cellSize = WATER.simSize / QUALITY.waterSegments;
+    this.detailHalf = DETAIL_HALF;
+    this.cellSize = (this.detailHalf * 2) / QUALITY.waterSegments;
     const geo = this._buildGeometry();
     this.mesh = new THREE.Mesh(geo, this.material);
     this.mesh.name = 'water';
@@ -388,12 +399,15 @@ export class Water {
     this._tmp = { v: new THREE.Vector3(), t: new THREE.Vector3(), up: new THREE.Vector3(), color: new THREE.Color() };
   }
 
-  /** Dense grid around the origin of the mesh, coarse ring outside it (the mesh moves with the camera). */
+  /**
+   * Fine grid around the mesh origin (the mesh is snapped to the camera) and a flat skirt
+   * out to the map edge. Vertex waves fade out before the skirt, so the join stays flat.
+   */
   _buildGeometry() {
-    const inner = new THREE.PlaneGeometry(WATER.simSize, WATER.simSize, QUALITY.waterSegments, QUALITY.waterSegments);
+    const inner = new THREE.PlaneGeometry(this.detailHalf * 2, this.detailHalf * 2, QUALITY.waterSegments, QUALITY.waterSegments);
     inner.rotateX(-Math.PI / 2);
     const parts = [inner];
-    const S = WATER.size, s = WATER.simSize;
+    const S = WATER.size, s = this.detailHalf * 2;
     const band = (S - s) / 2;
     const add = (w, d, x, z) => {
       const g = new THREE.PlaneGeometry(w, d, 8, 8); g.rotateX(-Math.PI / 2); g.translate(x, 0, z); parts.push(g);
@@ -421,12 +435,13 @@ export class Water {
 
   addDrop(x, z, radius, strength) { this.sim.addDrop(x, z, radius, strength); }
 
-  /** Keep the simulation window and the dense mesh around the camera focus. Call before adding drops. */
-  follow(focus) {
+  /** Slide the ripple window with the focus and keep the dense mesh under the camera. Call before adding drops. */
+  follow(focus, camera) {
     this.sim.follow(focus.x, focus.z);
-    const b = this.simBounds;
     const cs = this.cellSize;
-    this.mesh.position.set(Math.round((b.x + b.z / 2) / cs) * cs, 0, Math.round((b.y + b.w / 2) / cs) * cs);
+    const p = camera ? camera.position : focus;
+    // Snap to the vertex lattice so swell samples stay on the same world points as the camera moves.
+    this.mesh.position.set(Math.round(p.x / cs) * cs, 0, Math.round(p.z / cs) * cs);
   }
 
   update(dt) {
