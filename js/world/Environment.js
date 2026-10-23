@@ -63,7 +63,7 @@ export class Environment {
     this.hemi = new THREE.HemisphereLight(0xbfd8ff, 0x5b6b3a, 0.6);
     scene.add(this.hemi);
 
-    scene.fog = new THREE.FogExp2(0xbfd5ea, 0.0011);
+    scene.fog = new THREE.FogExp2(0xbfd5ea, 0.0007);
     this._buildRain();
     this._envTimer = 0;
     this.apply(0, true);
@@ -164,7 +164,7 @@ export class Environment {
     const fog = fogNight.clone().lerp(fogDay.lerp(fogSunset, sunset * 0.6), daylight);
     fog.lerp(new THREE.Color(0.5, 0.53, 0.57).multiplyScalar(0.2 + 0.8 * daylight), rain * 0.8);
     this.ctx.scene.fog.color.copy(fog);
-    this.ctx.scene.fog.density = lerp(0.0009, 0.0042, rain);
+    this.ctx.scene.fog.density = lerp(0.00055, 0.0032, rain);
 
     this.ctx.renderer.toneMappingExposure = lerp(1.45, 1.0, daylight);
 

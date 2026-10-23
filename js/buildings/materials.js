@@ -111,6 +111,39 @@ export function sharedMaterial(name) {
   return m;
 }
 
+const colorCache = new Map();
+/** Cached plain material, so modules that ask for the same look share one material (and merge into one draw call). */
+export function colorMat(color, { roughness = 0.7, metalness = 0, emissive = null } = {}) {
+  const key = `${color}|${roughness}|${metalness}|${emissive}`;
+  if (!colorCache.has(key)) {
+    const m = new THREE.MeshStandardMaterial({ color, roughness, metalness });
+    if (emissive !== null) m.emissive = new THREE.Color(emissive);
+    colorCache.set(key, m);
+  }
+  return colorCache.get(key);
+}
+
+/** Add a mesh with shadows to a group at a position. */
+export function mesh(group, geometry, material, x = 0, y = 0, z = 0, { cast = true, receive = true } = {}) {
+  const m = new THREE.Mesh(geometry, material);
+  m.position.set(x, y, z);
+  m.castShadow = cast; m.receiveShadow = receive;
+  group.add(m);
+  return m;
+}
+
+/** Cylinder between two points (columns, rails, cables). */
+export function rod(group, a, b, radius, material, sides = 8) {
+  const dir = new THREE.Vector3().subVectors(b, a);
+  const len = dir.length();
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, len, sides), material);
+  m.position.addVectors(a, b).multiplyScalar(0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+  m.castShadow = true;
+  group.add(m);
+  return m;
+}
+
 /** Helper: add a box mesh to a group. */
 export function box(group, w, h, d, x, y, z, material, { cast = true, receive = true } = {}) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);

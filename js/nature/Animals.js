@@ -141,26 +141,39 @@ export class Animals {
     return id ? this.terrain.islandById(id) : this.terrain.islands[Math.floor(this.rng() * this.terrain.islands.length)];
   }
 
-  _landPoint(isl) {
-    for (let k = 0; k < 80; k++) {
-      const a = this.rng() * Math.PI * 2, r = Math.sqrt(this.rng()) * isl.radius * 0.8;
-      const x = isl.x + Math.cos(a) * r, z = isl.z + Math.sin(a) * r;
-      if (this.ground.grassAt(x, z) > 0.9 && this.mask.isFree(x, z, 3)) {
-        if (isl.id === 'central' && Math.abs(x) < 75 && Math.abs(z) < 75) continue;
+  /** Grass point on the island; with `near`, stay within a short wander range so animals avoid crossing town. */
+  _landPoint(isl, near = null) {
+    const b = isl.landBox;
+    for (let k = 0; k < 160; k++) {
+      let x, z;
+      if (near && k < 100) {
+        const a = this.rng() * Math.PI * 2, r = 4 + this.rng() * 30;
+        x = near.x + Math.cos(a) * r; z = near.z + Math.sin(a) * r;
+      } else {
+        x = b[0] + this.rng() * (b[2] - b[0]); z = b[1] + this.rng() * (b[3] - b[1]);
+      }
+      if (x > -170 && x < 170 && z > -150 && z < 150) continue;
+      if (this.ground.grassAt(x, z) > 0.9 && this.mask.isFree(x, z, 3) && this.terrain.islandAt(x, z) === isl) {
         return new THREE.Vector3(x, 0, z);
       }
     }
-    return new THREE.Vector3(isl.x, 0, isl.z);
+    return near ? near.clone() : new THREE.Vector3(isl.x, 0, isl.z);
   }
 
-  _waterPoint(isl) {
-    for (let k = 0; k < 80; k++) {
-      const a = this.rng() * Math.PI * 2, r = isl.radius * (1.02 + this.rng() * 0.3);
-      const x = isl.x + Math.cos(a) * r, z = isl.z + Math.sin(a) * r;
+  _waterPoint(isl, near = null) {
+    const b = isl.landBox;
+    for (let k = 0; k < 200; k++) {
+      let x, z;
+      if (near && k < 120) {
+        const a = this.rng() * Math.PI * 2, r = 3 + this.rng() * 25;
+        x = near.x + Math.cos(a) * r; z = near.z + Math.sin(a) * r;
+      } else {
+        x = b[0] - 30 + this.rng() * (b[2] - b[0] + 60); z = b[1] - 30 + this.rng() * (b[3] - b[1] + 60);
+      }
       const h = this.terrain.heightAt(x, z);
       if (h < -0.4 && h > -4 && this.terrain.bridges?.heightAt(x, z) == null) return new THREE.Vector3(x, 0, z);
     }
-    return new THREE.Vector3(isl.x + isl.radius * 1.2, 0, isl.z);
+    return near ? near.clone() : new THREE.Vector3(b[2] + 20, 0, isl.z);
   }
 
   _spawn(spec) {
@@ -173,17 +186,17 @@ export class Animals {
     else { obj = makeGull(); a.speed = 9 + rng() * 3; }
     a.island = this._islandFor(spec);
     if (spec.type === 'gull') {
-      a.center = new THREE.Vector3((rng() - 0.5) * 300, 0, (rng() - 0.5) * 300);
+      a.center = new THREE.Vector3((rng() - 0.5) * 900, 0, (rng() - 0.5) * 900);
       a.radius = 25 + rng() * 50;
       a.alt = 16 + rng() * 22;
       a.angle = rng() * Math.PI * 2;
       a.dir = rng() < 0.5 ? 1 : -1;
     } else if (spec.type === 'duck') {
       obj.position.copy(this._waterPoint(a.island));
-      a.target = this._waterPoint(a.island);
+      a.target = this._waterPoint(a.island, obj.position);
     } else {
       obj.position.copy(this._landPoint(a.island));
-      a.target = this._landPoint(a.island);
+      a.target = this._landPoint(a.island, obj.position);
     }
     if (spec.type === 'deer') obj.scale.setScalar(0.95 + rng() * 0.2);
     const info = { ...INFO[spec.type], id: `${spec.type}-${this.list.length}` };
@@ -216,7 +229,7 @@ export class Animals {
         if (a.type === 'deer') o.userData.parts.neck.rotation.x = THREE.MathUtils.lerp(o.userData.parts.neck.rotation.x, 1.2, dt * 2);
         if (a.timer <= 0) {
           a.state = 'move';
-          a.target = a.type === 'duck' ? this._waterPoint(a.island) : this._landPoint(a.island);
+          a.target = a.type === 'duck' ? this._waterPoint(a.island, o.position) : this._landPoint(a.island, o.position);
         }
       } else {
         const dx = a.target.x - o.position.x, dz = a.target.z - o.position.z;

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#0b1a2a" />
   <meta name="description" content="Pumpkin Island 南瓜岛 — a WebGL island city built with Three.js r128: GPU water ripples, caustics, glass towers, bridges, day/night and rain." />
-  <title>Pumpkin Island</title>
+  <title>Pumpkin Island 南瓜岛</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cellipse cx='32' cy='38' rx='26' ry='20' fill='%23f08a1c'/%3E%3Cellipse cx='32' cy='38' rx='10' ry='20' fill='%23f6a03c'/%3E%3Crect x='29' y='8' width='6' height='12' rx='2' fill='%232f7d32'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="css/style.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"
@@ -19,9 +19,10 @@
   <header id="title">
     <div class="logo" aria-hidden="true"></div>
     <div>
-      <h1>Pumpkin Island</h1>
-      <p>南瓜岛 · 群岛之城</p>
+      <h1>Pumpkin Island <span class="zh">南瓜岛</span></h1>
+      <p>群岛之城 · The Archipelago City</p>
     </div>
+    <button class="hide-title" aria-label="隐藏标题" title="隐藏标题（可在设置中恢复）">&times;</button>
   </header>
 
   <button id="panel-toggle" class="icon-btn" aria-label="设置">
@@ -53,7 +54,11 @@
         <button data-value="orbit" class="active">环绕</button>
         <button data-value="walk">漫游</button>
       </div>
-      <label class="toggle"><input id="show-labels" type="checkbox" checked /> 显示名称</label>
+      <div class="chips">
+        <label class="toggle"><input id="show-labels" type="checkbox" checked /> 显示名称</label>
+        <label class="toggle"><input id="show-title" type="checkbox" checked /> 显示标题</label>
+        <button id="show-help" type="button">操作说明</button>
+      </div>
     </section>
     <section>
       <h2>地点 Places</h2>
@@ -73,16 +78,42 @@
 
   <div id="hint"></div>
 
-  <div id="joystick" hidden><div class="knob"></div></div>
+  <nav id="nav" aria-label="视角控制">
+    <button data-hold="zoom" data-v="1" aria-label="放大" title="放大">
+      <svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg></button>
+    <button data-hold="zoom" data-v="-1" aria-label="缩小" title="缩小">
+      <svg viewBox="0 0 24 24"><path d="M5 11h14v2H5z"/></svg></button>
+    <button data-hold="rotate" data-v="1" aria-label="向左转" title="向左转">
+      <svg viewBox="0 0 24 24"><path d="M12 5a7 7 0 1 1-6.7 9h2.1A5 5 0 1 0 12 7v3L7.5 6 12 2z"/></svg></button>
+    <button data-hold="rotate" data-v="-1" aria-label="向右转" title="向右转">
+      <svg viewBox="0 0 24 24"><path d="M12 5a7 7 0 1 0 6.7 9h-2.1A5 5 0 1 1 12 7v3l4.5-4L12 2z"/></svg></button>
+    <button id="compass" aria-label="朝北复位" title="朝北复位">
+      <svg viewBox="0 0 24 24"><path class="n" d="M12 3l4 9h-8z"/><path class="s" d="M12 21l-4-9h8z"/></svg></button>
+  </nav>
   <div id="vbtns" hidden>
     <button data-v="1" aria-label="上升">▲</button>
     <button data-v="-1" aria-label="下降">▼</button>
+  </div>
+
+  <section id="tips" hidden>
+    <h3>操作说明</h3>
+    <ul class="tip-list"></ul>
+    <div class="actions"><button class="primary ok">知道了</button></div>
+  </section>
+
+  <div id="lost" hidden>
+    <div class="loader-card">
+      <h1>画面已暂停</h1>
+      <p class="status">浏览器回收了图形资源（常见于切换应用或内存不足）。</p>
+      <button class="primary" onclick="location.reload()">重新加载</button>
+    </div>
   </div>
 
   <div id="loader">
     <div class="loader-card">
       <div class="logo big" aria-hidden="true"></div>
       <h1>Pumpkin Island</h1>
+      <p class="zh-title">南瓜岛</p>
       <div class="bar"><div class="fill"></div></div>
       <p class="status">正在加载…</p>
     </div>

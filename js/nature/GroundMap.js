@@ -11,18 +11,13 @@ export class GroundMap {
     const n = res * res;
     this.height = new Float32Array(n);
     this.grass = new Float32Array(n);
-    const islands = terrain.islands;
+    const field = terrain.field;
     for (let j = 0; j < res; j++) {
       const z = -half + (j + 0.5) / res * this.size;
       for (let i = 0; i < res; i++) {
         const x = -half + (i + 0.5) / res * this.size;
         const k = j * res + i;
-        let near = false;
-        for (const isl of islands) {
-          const dx = x - isl.x, dz = z - isl.z;
-          if (dx * dx + dz * dz < isl.radius * isl.radius * 1.4) { near = true; break; }
-        }
-        if (!near) { this.height[k] = -10; continue; }
+        if (!field.influencedAt(x, z)) { this.height[k] = -10; continue; }
         const h = terrain.heightAt(x, z);
         this.height[k] = h;
         if (h > 1.25 && mask.isFree(x, z, 0.3)) this.grass[k] = 1;

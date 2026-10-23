@@ -29,6 +29,18 @@ void main() {
 }
 `;
 
+// Copies the state shifted by uOffset (in uv) when the simulated window moves with the camera.
+const SHIFT_FS = /* glsl */`
+precision highp float;
+uniform sampler2D uTex;
+uniform vec2 uOffset;
+varying vec2 vUv;
+void main() {
+  vec2 uv = vUv + uOffset;
+  gl_FragColor = (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) ? vec4(0.0) : texture2D(uTex, uv);
+}
+`;
+
 const UPDATE_FS = /* glsl */`
 precision highp float;
 uniform sampler2D uTex;
@@ -107,6 +119,8 @@ export class RippleSimulation {
     this.normalMat = this._mat(NORMAL_FS, {
       uTex: { value: null }, uDelta: { value: delta }, uTexel: { value: bounds.z / resolution },
     });
+    this.shiftMat = this._mat(SHIFT_FS, { uTex: { value: null }, uOffset: { value: new THREE.Vector2() } });
+    this.pendingShift = null;
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -138,6 +152,21 @@ export class RippleSimulation {
 
   get texture() { return this.rtA.texture; }
 
+  /**
+   * Keep the simulated window centered near (x, z). Moves in whole-texel steps once the focus
+   * drifts more than a quarter of the window, shifting the existing waves along.
+   */
+  follow(x, z) {
+    const b = this.bounds;
+    const cx = b.x + b.z / 2, cz = b.y + b.w / 2;
+    if (Math.abs(x - cx) < b.z / 4 && Math.abs(z - cz) < b.w / 4) return false;
+    const texel = b.z / this.res;
+    const dx = Math.round((x - cx) / texel) * texel, dz = Math.round((z - cz) / texel) * texel;
+    b.x += dx; b.y += dz;
+    this.pendingShift = [dx / b.z, dz / b.w];
+    return true;
+  }
+
   /** Queue a drop at world (x, z). radius in meters, strength in meters of displacement. */
   addDrop(x, z, radius = 2, strength = 0.4) {
     const u = (x - this.bounds.x) / this.bounds.z;
@@ -163,6 +192,11 @@ export class RippleSimulation {
     const prevXr = r.xr.enabled;
     r.xr.enabled = false;
     r.autoClear = false;
+    if (this.pendingShift) {
+      this.shiftMat.uniforms.uOffset.value.set(this.pendingShift[0], this.pendingShift[1]);
+      this._pass(this.shiftMat);
+      this.pendingShift = null;
+    }
     while (this.queue.length) {
       const batch = this.queue.splice(0, MAX_DROPS);
       batch.forEach((d, i) => this.dropMat.uniforms.uDrops.value[i].set(d[0], d[1], d[2], d[3]));

@@ -1,31 +1,55 @@
 // Global world settings. Tweak islands, colors and render quality here.
 
 export const SEA_LEVEL = 0;
-export const CITY_GROUND = 2.0; // plateau height of the city island
+export const CITY_GROUND = 2.0; // plateau height shared by every island (roads and lots are flat)
 
 export const TERRAIN = {
-  size: 900,          // world units (meters), centered on origin
+  size: 1600,         // world units (meters), centered on origin; islands must stay inside
   seabed: -18,        // open-sea floor depth
+  shore: 22,          // meters from the coastline inland until the plateau height is reached
+  heightCell: 1.5,    // resolution of the baked height grid used by everything that queries the ground
 };
 
 /**
- * Islands. `hills` adds noisy relief inside the island (0 = perfectly flat plateau).
- * `flat` is the fraction of the radius that stays at plateau height before the beach.
+ * Islands are a smooth union of circles ("blobs": [x, z, radius]) with a noisy coastline,
+ * which gives irregular bays and headlands. `coast` is the coastline noise amplitude in meters.
+ * `hills`: [x, z, radius, height] bumps, kept away from the shore. Roads/lots must avoid hills.
+ * (x, z) is the label / focus point of the island.
  */
 export const ISLANDS = [
-  { id: 'central', name: '南瓜中心岛', nameEn: 'Pumpkin Central', x: 0, z: 0, radius: 108, height: CITY_GROUND, hills: 0, flat: 0.84, shape: 0.07, seed: 11 },
-  { id: 'east', name: '东林岛', nameEn: 'East Grove', x: 228, z: 18, radius: 70, height: 2.2, hills: 9, flat: 0.8, shape: 0.14, seed: 23 },
-  { id: 'north', name: '北原岛', nameEn: 'North Meadow', x: -12, z: -222, radius: 64, height: 2.0, hills: 5, flat: 0.8, shape: 0.13, seed: 37 },
-  { id: 'west', name: '西岭岛', nameEn: 'West Ridge', x: -232, z: -14, radius: 76, height: 2.4, hills: 18, flat: 0.78, shape: 0.15, seed: 41 },
-  { id: 'south', name: '南湾岛', nameEn: 'South Cove', x: 28, z: 200, radius: 50, height: 1.8, hills: 3, flat: 0.8, shape: 0.12, seed: 53 },
+  {
+    id: 'central', name: '南瓜中心岛', nameEn: 'Pumpkin Central', x: -10, z: 10, seed: 11, coast: 22,
+    blobs: [[0, 0, 178], [120, -95, 92], [-128, 92, 92], [100, 118, 82], [-125, -108, 80], [205, 8, 62], [150, 62, 62], [-212, -6, 58], [8, 188, 58], [-8, -196, 56]],
+    hills: [],
+  },
+  {
+    id: 'east', name: '东林岛', nameEn: 'East Grove', x: 470, z: 10, seed: 23, coast: 26,
+    blobs: [[440, 15, 118], [520, -60, 80], [520, 90, 78], [400, 105, 66], [395, -85, 60], [610, 30, 40], [470, 150, 42]],
+    hills: [[568, -52, 62, 16], [560, 70, 55, 11], [600, 10, 40, 8]],
+  },
+  {
+    id: 'north', name: '北原岛', nameEn: 'North Meadow', x: 10, z: -470, seed: 37, coast: 24,
+    blobs: [[0, -455, 112], [-90, -500, 72], [95, -490, 70], [10, -560, 62], [-40, -385, 50], [60, -395, 62], [-150, -470, 40], [150, -440, 36]],
+    hills: [[-135, -520, 48, 13], [100, -545, 44, 9]],
+  },
+  {
+    id: 'west', name: '西岭岛', nameEn: 'West Ridge', x: -480, z: -10, seed: 41, coast: 26,
+    blobs: [[-450, -5, 116], [-540, -70, 84], [-530, 80, 76], [-395, -95, 70], [-395, 85, 66], [-620, 0, 42], [-470, -140, 40]],
+    hills: [[-560, -60, 70, 24], [-545, 75, 55, 15], [-600, 10, 45, 12]],
+  },
+  {
+    id: 'south', name: '南湾岛', nameEn: 'South Cove', x: 40, z: 470, seed: 53, coast: 22,
+    blobs: [[20, 450, 104], [110, 470, 74], [-70, 485, 62], [40, 540, 56], [0, 385, 50], [-50, 410, 52], [175, 430, 34], [-130, 520, 34]],
+    hills: [[-95, 510, 38, 7]],
+  },
 ];
 
 export const WATER = {
-  size: 2400,
+  size: 7000,
   shallowColor: [0.10, 0.78, 0.74],  // turquoise near the beach
   midColor: [0.03, 0.42, 0.62],
   deepColor: [0.012, 0.075, 0.26],   // sapphire offshore
-  simSize: 520,     // the GPU ripple simulation covers [-simSize/2, simSize/2]
+  simSize: 560,     // the GPU ripple simulation follows the camera and covers simSize x simSize meters
   maxDepth: 16,
 };
 
@@ -40,6 +64,7 @@ export const SKY = {
 export const START_TIME = 15.5; // hour of day when the page loads
 
 function detectMobile() {
+  if (typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent || '';
   return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (navigator.maxTouchPoints > 1 && window.innerWidth < 1100);
 }
@@ -47,29 +72,33 @@ function detectMobile() {
 export const IS_MOBILE = detectMobile();
 
 export const QUALITY = IS_MOBILE ? {
-  pixelRatio: Math.min(window.devicePixelRatio, 1.5),
+  pixelRatio: typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 1.5) : 1,
   shadowMapSize: 1024,
-  terrainSegments: 240,
-  waterSegments: 220,
+  terrainCell: 3,
+  waterSegments: 200,
   simResolution: 256,
   reflectionScale: 0.35,
   refractionScale: 0.4,
   grassCount: 14000,
   grassRadius: 55,
-  treeCount: 900,
+  treeCount: 1500,
   rainCount: 4000,
+  carCount: 24,
+  groundRes: 900,
   antialias: false,
 } : {
-  pixelRatio: Math.min(window.devicePixelRatio, 2),
+  pixelRatio: typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1,
   shadowMapSize: 2048,
-  terrainSegments: 380,
-  waterSegments: 360,
+  terrainCell: 2,
+  waterSegments: 340,
   simResolution: 512,
   reflectionScale: 0.5,
   refractionScale: 0.6,
   grassCount: 45000,
   grassRadius: 80,
-  treeCount: 1900,
+  treeCount: 3600,
   rainCount: 12000,
+  carCount: 46,
+  groundRes: 1200,
   antialias: true,
 };

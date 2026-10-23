@@ -1,5 +1,5 @@
 // Bridges between islands. Placement is found by marching across the terrain from a city road end.
-import { BRIDGES, ROAD_STYLE } from '../config/city.layout.js';
+import { BRIDGES, ROADS, ROAD_STYLE } from '../config/city.layout.js';
 import { roadTexture, paverTexture, concreteTexture } from '../core/Textures.js';
 import { rodMatrix, instancedFrom, clamp } from '../core/Utils.js';
 
@@ -15,13 +15,15 @@ export class Bridge {
     const startIsland = terrain.islandAt(F.x, F.y);
     const target = terrain.islandById(cfg.to);
     const hStart = terrain.heightAt(F.x, F.y);
-    let tA = 0;
-    for (let t = 0; t < 400; t += 0.5) {
-      const x = F.x + this.D.x * t, z = F.y + this.D.y * t;
-      if (terrain.heightAt(x, z) < hStart - 0.03) { tA = Math.max(0, t - 1.5); break; }
+    // Abutment A: last plateau point before the water (small dips on the way are ignored).
+    let tA = 0, lastFlat = 0;
+    for (let t = 0; t < 600; t += 0.5) {
+      const h = terrain.heightAt(F.x + this.D.x * t, F.y + this.D.y * t);
+      if (h >= hStart - 0.03) lastFlat = t;
+      if (h < 0) { tA = Math.max(0, lastFlat - 1.5); break; }
     }
     let tB = tA + 10;
-    for (let t = tA + 5; t < 600; t += 0.5) {
+    for (let t = tA + 5; t < 800; t += 0.5) {
       const x = F.x + this.D.x * t, z = F.y + this.D.y * t;
       const isl = terrain.islandAt(x, z);
       if (isl && isl.id === target.id && terrain.heightAt(x, z) >= target.height - 0.03) { tB = t + 1.5; break; }
@@ -121,14 +123,26 @@ export class Bridges {
   /** Extra road segments that connect the city grid and far islands to the bridge decks. */
   connectorRoads() {
     const roads = [];
+    const same = (p, x, z) => Math.abs(p[0] - x) < 0.5 && Math.abs(p[1] - z) < 0.5;
     for (const b of this.items) {
       if (b.A.distanceTo(b.start) > 0.5) {
-        roads.push({ id: `${b.id}-approach`, name: b.cfg.name + '引道', nameEn: b.cfg.nameEn + ' Approach',
-          from: [b.start.x, b.start.y], to: [b.A.x, b.A.y], lanes: b.lanes, endA: 'node', endB: 'bridge' });
+        const src = ROADS.find((r) => same(r.from, b.start.x, b.start.y) || same(r.to, b.start.x, b.start.y));
+        roads.push({ id: `${b.id}-approach`, name: src ? src.name : b.cfg.name, nameEn: src ? src.nameEn : b.cfg.nameEn,
+          from: [b.start.x, b.start.y], to: [b.A.x, b.A.y], lanes: b.lanes, endA: 'node', endB: 'bridge', connector: true });
       }
-      const end = b.B.clone().addScaledVector(b.D, 18);
-      roads.push({ id: `${b.id}-landing`, name: b.toIsland.name + '入口', nameEn: b.toIsland.nameEn + ' Entrance',
-        from: [b.B.x, b.B.y], to: [end.x, end.y], lanes: b.lanes, endA: 'bridge', endB: 'deadend' });
+      // Join the first collinear road straight ahead on the far island, else end in a short stub.
+      let joinT = Infinity, joinRoad = null;
+      for (const r of ROADS) {
+        for (const p of [r.from, r.to]) {
+          const dx = p[0] - b.B.x, dz = p[1] - b.B.y;
+          const along = dx * b.D.x + dz * b.D.y, across = Math.abs(dx * b.R.x + dz * b.R.y);
+          if (across < 0.5 && along > -0.5 && along < 120 && along < joinT) { joinT = along; joinRoad = r; }
+        }
+      }
+      const end = b.B.clone().addScaledVector(b.D, joinRoad ? Math.max(joinT, 0.5) : 18);
+      roads.push({ id: `${b.id}-landing`, name: joinRoad ? joinRoad.name : b.toIsland.name + '入口',
+        nameEn: joinRoad ? joinRoad.nameEn : b.toIsland.nameEn + ' Entrance',
+        from: [b.B.x, b.B.y], to: [end.x, end.y], lanes: b.lanes, endA: 'bridge', endB: joinRoad ? 'node' : 'deadend', connector: true });
     }
     return roads;
   }

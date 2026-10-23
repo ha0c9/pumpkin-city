@@ -46,17 +46,12 @@ export class Interaction {
       const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
       const dt = performance.now() - down.t;
       down = null;
-      if (moved > 7 || dt > 600 || controls.pointers.size > 1) return;
+      if (moved > 8 || dt > 600 || controls.multiTouch || (controls.stick && controls.stick.id === e.pointerId)) return;
       const now = performance.now();
       const dbl = now - lastClick < 320;
       lastClick = now;
       this.click(e.clientX, e.clientY, dbl);
     });
-    // Track the cursor's ground point for zoom-to-cursor.
-    dom.addEventListener('wheel', (e) => {
-      const hit = this._groundHit(e.clientX, e.clientY);
-      controls.cursorPoint = hit ? hit.point : null;
-    }, { passive: true });
   }
 
   _makeMarker() {
@@ -85,7 +80,7 @@ export class Interaction {
     const { origin, direction } = this.raycaster.ray;
     const p = new THREE.Vector3();
     let prev = 0;
-    for (let t = 0.5; t < 2500; t += Math.max(0.5, t * 0.01)) {
+    for (let t = 0.5; t < 5000; t += Math.max(0.5, t * 0.01)) {
       p.copy(origin).addScaledVector(direction, t);
       const ground = Math.max(this.terrain.heightAt(p.x, p.z), 0);
       if (p.y <= ground) {
@@ -111,8 +106,10 @@ export class Interaction {
     const objHit = hits.find((h) => h.object.visible !== false && h.object.userData.pick);
     const ground = this._groundHit(x, y);
     if (objHit && (!ground || objHit.distance <= ground.distance + 0.5)) {
-      this.select(objHit.object.userData.pick, objHit);
-      if (dbl) this.focusOn(objHit.object.userData.pick);
+      const ud = objHit.object.userData;
+      const info = ud.pickResolver ? ud.pickResolver(objHit) : ud.pick;
+      this.select(info, objHit);
+      if (dbl) this.focusOn(info.focus ? info : { ...info, focus: objHit.point.toArray(), radius: 30 });
       return;
     }
     if (ground) {
@@ -136,7 +133,9 @@ export class Interaction {
     } else {
       let root = hit ? hit.object : null;
       while (root && root.parent && root.parent.userData.pick === info) root = root.parent;
-      if (root) box.setFromObject(root);
+      // Merged meshes (roads, signs) hold many items: highlight around the hit point instead of the whole mesh.
+      if (root && root.userData.pickResolver && hit) box.setFromCenterAndSize(hit.point, new THREE.Vector3(6, 4, 6));
+      else if (root) box.setFromObject(root);
       this._followRoot = info.follow ? root : null;
     }
     this.highlight.box.copy(box);
@@ -168,7 +167,7 @@ export class Interaction {
       const surface = this.terrain.surfaceAt(p.x, p.z);
       const surfaceName = { sand: '沙滩 Beach', grass: '草地 Meadow', rock: '岩石 Rock' }[surface] || '陆地';
       name = isl ? `${isl.name} · ${surfaceName}` : surfaceName;
-      desc = `海拔 ${h.toFixed(1)} 米。${isl && isl.id !== 'central' ? '此处暂为自然植被，预留未来开发。' : ''}`;
+      desc = `海拔 ${h.toFixed(1)} 米。${surface === 'grass' ? '空地上长满草与树木，预留未来开发。' : ''}`;
     }
     if (onBridge !== null) name = '桥面 Bridge deck';
     this.marker.position.set(p.x, Math.max(h, 0) + 0.15, p.z);
@@ -202,8 +201,11 @@ export class Interaction {
     const el = document.createElement('div');
     el.className = `world-label ${cls}`;
     el.innerHTML = `<span>${text}</span>${sub ? `<small>${sub}</small>` : ''}`;
+    el.style.display = 'none';
     this.ui.labelLayer.appendChild(el);
-    this.labels.push({ el, position: position.clone(), island: cls.includes('island'), minor: cls.includes('minor') });
+    const island = cls.includes('island'), minor = cls.includes('minor');
+    const priority = island ? 0 : cls.includes('bridge') ? 2 : minor ? 3 : 1;
+    this.labels.push({ el, position: position.clone(), island, minor, priority, w: 0, h: 0, shown: false });
     return el;
   }
 
@@ -213,15 +215,35 @@ export class Interaction {
     const cam = this.ctx.camera;
     const w = this.ctx.renderer.domElement.clientWidth, h = this.ctx.renderer.domElement.clientHeight;
     const v = new THREE.Vector3();
+    // Candidates in priority order (islands, landmarks, bridges, minor places; nearer first), then drop any label
+    // that would overlap one already placed so the screen never turns into a pile of tags.
+    const cands = [];
     for (const l of this.labels) {
       v.copy(l.position).project(cam);
       const dist = cam.position.distanceTo(l.position);
-      const show = this.labelsVisible && v.z < 1 && v.z > -1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1 && (l.island ? dist < 1400 && dist > 220 : dist < (l.minor ? 320 : 700));
-      l.el.style.display = show ? '' : 'none';
-      if (show) {
-        l.el.style.transform = `translate(-50%, -100%) translate(${(v.x * 0.5 + 0.5) * w}px, ${(-v.y * 0.5 + 0.5) * h}px)`;
-        l.el.style.opacity = String(Math.max(0.35, 1 - dist / (l.island ? 1800 : 900)));
+      const ok = this.labelsVisible && v.z < 1 && v.z > -1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1 && (l.island ? dist < 2600 && dist > 260 : dist < (l.minor ? 420 : 1100));
+      if (ok) cands.push({ l, dist, x: (v.x * 0.5 + 0.5) * w, y: (-v.y * 0.5 + 0.5) * h });
+      else if (l.shown) { l.el.style.display = 'none'; l.shown = false; }
+    }
+    cands.sort((a, b) => a.l.priority - b.l.priority || a.dist - b.dist);
+    const placed = [];
+    for (const c of cands) {
+      const l = c.l;
+      if (!l.w) {
+        l.el.style.display = '';
+        l.w = l.el.offsetWidth || 80; l.h = l.el.offsetHeight || 24;
+        l.shown = true;
       }
+      const r = { x0: c.x - l.w / 2 - 3, x1: c.x + l.w / 2 + 3, y0: c.y - l.h - 6, y1: c.y + 2 };
+      const clash = placed.some((p) => r.x0 < p.x1 && r.x1 > p.x0 && r.y0 < p.y1 && r.y1 > p.y0);
+      if (clash) {
+        if (l.shown) { l.el.style.display = 'none'; l.shown = false; }
+        continue;
+      }
+      placed.push(r);
+      if (!l.shown) { l.el.style.display = ''; l.shown = true; }
+      l.el.style.transform = `translate(-50%, -100%) translate(${c.x}px, ${c.y}px)`;
+      l.el.style.opacity = String(Math.max(0.35, 1 - c.dist / (l.island ? 3200 : 1400)));
     }
     if (this.marker.visible) {
       const s = 1 + Math.sin(t * 4) * 0.12;

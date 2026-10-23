@@ -1,8 +1,15 @@
 // Street lamps (instanced, glowing at night) and traffic signals.
-import { mergeColored, makeCanvas, canvasTexture } from '../core/Utils.js';
+import { mergeColored, makeCanvas, canvasTexture, instancedFrom } from '../core/Utils.js';
 import { IS_MOBILE } from '../config/world.config.js';
 
 const THREE = window.THREE;
+
+/** Shared 24 s signal cycle: traffic along x and along z alternate. */
+export function signalState(axis, time) {
+  const t = time % 24;
+  if (axis === 'x') return t < 10 ? 'green' : t < 12 ? 'yellow' : 'red';
+  return t < 12 ? 'red' : t < 22 ? 'green' : 'yellow';
+}
 
 function lampGeometry() {
   const parts = [];
@@ -72,18 +79,18 @@ export class StreetFurniture {
     this.ctx.nightMaterials.push({ material: this.bulbMat, intensity: 4 });
   }
 
+  /** Instanced signal poles (one geometry per arm reach) and instanced lamp discs per axis/color. */
   _buildSignals(signals) {
     if (!signals.length) return;
     const poleParts = (reach) => {
       const q = new THREE.Quaternion();
-      const parts = [
+      return mergeColored([
         { geometry: new THREE.CylinderGeometry(0.11, 0.14, 6.0, 10), matrix: new THREE.Matrix4().makeTranslation(0, 3, 0), color: 0x4a4f55 },
         { geometry: new THREE.CylinderGeometry(0.07, 0.07, reach, 8),
           matrix: new THREE.Matrix4().compose(new THREE.Vector3(-reach / 2, 5.8, 0), q.setFromEuler(new THREE.Euler(0, 0, Math.PI / 2)), new THREE.Vector3(1, 1, 1)), color: 0x4a4f55 },
         { geometry: new THREE.BoxGeometry(0.42, 1.25, 0.32), matrix: new THREE.Matrix4().makeTranslation(-reach, 5.2, 0), color: 0x1d1f22 },
         { geometry: new THREE.BoxGeometry(0.34, 0.95, 0.28), matrix: new THREE.Matrix4().makeTranslation(0, 2.6, 0.12), color: 0x1d1f22 },
-      ];
-      return mergeColored(parts);
+      ]);
     };
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.5 });
     const colors = { red: 0xff2a1a, yellow: 0xffb000, green: 0x22ff66 };
@@ -93,28 +100,35 @@ export class StreetFurniture {
         this.signalMats[`${axis}-${name}`] = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: hex, emissiveIntensity: 0.1 });
       }
     }
+    const pick = { id: 'traffic-signal', name: '交通信号灯', nameEn: 'Traffic Signal', category: '市政设施 Facility', description: '红黄绿三色信号灯，按方向周期切换，汽车会在红灯前停车。' };
+    const byReach = new Map();
+    const discs = new Map();
+    const lightOffsets = { red: 5.58, yellow: 5.2, green: 4.82 };
+    const m = new THREE.Matrix4(), local = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+    const pushDisc = (key, matrix) => { if (!discs.has(key)) discs.set(key, []); discs.get(key).push(matrix.clone()); };
+    for (const s of signals) {
+      const reach = Math.round(s.reach * 4) / 4;
+      if (!byReach.has(reach)) byReach.set(reach, []);
+      q.setFromEuler(e.set(0, Math.atan2(s.face[0], s.face[1]), 0));
+      m.compose(new THREE.Vector3(s.x, s.y, s.z), q, new THREE.Vector3(1, 1, 1));
+      byReach.get(reach).push(m.clone());
+      for (const [name, y] of Object.entries(lightOffsets)) {
+        pushDisc(`${s.axis}-${name}`, local.copy(m).multiply(new THREE.Matrix4().makeTranslation(-reach, y, 0.18)));
+        if (name !== 'yellow') {
+          const pm = new THREE.Matrix4().compose(new THREE.Vector3(0, name === 'red' ? 2.82 : 2.38, 0.27), new THREE.Quaternion(), new THREE.Vector3(0.9, 0.9, 0.9));
+          pushDisc(`${s.axis}-${name}`, local.copy(m).multiply(pm));
+        }
+      }
+    }
+    for (const [reach, list] of byReach) {
+      const poles = instancedFrom(poleParts(reach), mat, list);
+      poles.userData.pick = pick;
+      this.group.add(poles);
+      this.ctx.pickables.push(poles);
+    }
     const disc = new THREE.CylinderGeometry(0.12, 0.12, 0.05, 14);
     disc.rotateX(Math.PI / 2);
-    const lightOffsets = { red: 5.58, yellow: 5.2, green: 4.82 };
-    const pick = { id: 'traffic-signal', name: '交通信号灯', nameEn: 'Traffic Signal', category: '市政设施 Facility', description: '红黄绿三色信号灯，按方向周期切换。' };
-    for (const s of signals) {
-      const g = new THREE.Group();
-      g.position.set(s.x, s.y, s.z);
-      g.rotation.y = Math.atan2(s.face[0], s.face[1]);
-      const pole = new THREE.Mesh(poleParts(s.reach), mat);
-      pole.castShadow = true;
-      g.add(pole);
-      for (const [name, y] of Object.entries(lightOffsets)) {
-        const l = new THREE.Mesh(disc, this.signalMats[`${s.axis}-${name}`]);
-        l.position.set(-s.reach, y, 0.18);
-        g.add(l);
-        const ped = new THREE.Mesh(disc, this.signalMats[`${s.axis}-${name === 'yellow' ? 'red' : name}`]);
-        if (name !== 'yellow') { ped.position.set(0, name === 'red' ? 2.82 : 2.38, 0.27); ped.scale.setScalar(0.9); g.add(ped); }
-      }
-      g.traverse((o) => { o.userData.pick = pick; });
-      this.group.add(g);
-      this.ctx.pickables.push(g);
-    }
+    for (const [key, list] of discs) this.group.add(instancedFrom(disc, this.signalMats[key], list, { castShadow: false, receiveShadow: false }));
   }
 
   _buildPointLights() {
@@ -130,11 +144,8 @@ export class StreetFurniture {
 
   update(time, night, focus) {
     if (this.signalMats) {
-      const t = time % 24;
-      const xs = t < 10 ? 'green' : t < 12 ? 'yellow' : 'red';
-      const zs = t < 12 ? 'red' : t < 22 ? 'green' : 'yellow';
       for (const axis of ['x', 'z']) {
-        const on = axis === 'x' ? xs : zs;
+        const on = signalState(axis, time);
         for (const c of ['red', 'yellow', 'green']) {
           this.signalMats[`${axis}-${c}`].emissiveIntensity = c === on ? 3.0 : 0.05;
         }
