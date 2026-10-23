@@ -154,13 +154,15 @@ export class RippleSimulation {
 
   /**
    * Keep the simulated window centered near (x, z). Moves in whole-texel steps once the focus
-   * drifts more than a quarter of the window, shifting the existing waves along.
+   * drifts more than a few texels, shifting the existing waves along.
    */
   follow(x, z) {
     const b = this.bounds;
     const cx = b.x + b.z / 2, cz = b.y + b.w / 2;
-    if (Math.abs(x - cx) < b.z / 4 && Math.abs(z - cz) < b.w / 4) return false;
     const texel = b.z / this.res;
+    // A quarter-window jump dragged the dense-grid edge across the view. Shift as soon as the
+    // focus clears a few texels so the patch tracks the camera instead of popping.
+    if (Math.abs(x - cx) < texel * 4 && Math.abs(z - cz) < texel * 4) return false;
     const dx = Math.round((x - cx) / texel) * texel, dz = Math.round((z - cz) / texel) * texel;
     b.x += dx; b.y += dz;
     this.pendingShift = [dx / b.z, dz / b.w];
