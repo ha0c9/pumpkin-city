@@ -28,8 +28,9 @@ function octagon(group, r, h, y, wallMat, roofMat) {
 registerBuilding('americaTower', {
   label: '超高层 Skyscraper',
   footprint: [36, 33],
-  create(ctx) {
+  create(ctx, spec = {}) {
     const g = new THREE.Group();
+    const signLines = spec.sign || ['美国大厦 1号楼', 'AMERICA TOWER 1'];
     const steel = sharedMaterial('steel');
     const roof = sharedMaterial('roof');
     const floorH = 4;
@@ -97,7 +98,7 @@ registerBuilding('americaTower', {
     // Entrance canopy + sign facing +Z.
     box(g, 14, 0.5, 2.8, 0, 6.5, 15.4, steel);
     for (const sx of [-1, 1]) box(g, 0.3, 6.3, 0.3, sx * 6.6, 3.45, 16.5, steel);
-    const signTex = textTexture(['美国大厦', 'AMERICA TOWER'], { width: 1024, height: 256, color: '#f5f1e6', glow: 'rgba(255,220,160,0.6)' });
+    const signTex = textTexture(signLines, { width: 1024, height: 256, color: '#f5f1e6', glow: 'rgba(255,220,160,0.6)' });
     const signMat = new THREE.MeshStandardMaterial({ map: signTex, transparent: true, emissive: 0xffffff, emissiveMap: signTex, emissiveIntensity: 0.25, roughness: 0.4 });
     ctx.nightMaterials.push({ material: signMat, intensity: 1.4, base: 0.25 });
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(12, 3), signMat);
@@ -105,7 +106,7 @@ registerBuilding('americaTower', {
     g.add(sign);
     // Monument sign on the plaza.
     box(g, 6, 1.6, 0.8, -13.5, 1.1, 15.6, sharedMaterial('stoneDark'));
-    const mono = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 1.4), new THREE.MeshStandardMaterial({ map: textTexture(['美国大厦', 'AMERICA TOWER'], { color: '#2a2a2a' }), transparent: true }));
+    const mono = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 1.4), new THREE.MeshStandardMaterial({ map: textTexture(signLines, { color: '#2a2a2a' }), transparent: true }));
     mono.position.set(-13.5, 1.15, 16.02);
     g.add(mono);
 

@@ -51,7 +51,7 @@ export class App {
       mask: new OccupancyMask(),
       pickables: [], nightMaterials: [], wetMaterials: [], animators: [],
       uniforms: {
-        uTime: { value: 0 }, uRain: { value: 0 }, uDaylight: { value: 1 }, uSunset: { value: 0 }, uNight: { value: 0 },
+        uTime: { value: 0 }, uRain: { value: 0 }, uStorm: { value: 0 }, uDaylight: { value: 1 }, uSunset: { value: 0 }, uNight: { value: 0 },
         uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uMoonDir: { value: new THREE.Vector3(0, -1, 0) },
         uSunColor: { value: new THREE.Vector3(1, 1, 1) }, uAmbient: { value: new THREE.Vector3(0.3, 0.35, 0.4) },
         uSimTex: { value: null }, uSimBounds: { value: new THREE.Vector4(0, 0, 1, 1) },
@@ -126,9 +126,10 @@ export class App {
       if (info.featured) places.push({ name: info.name, tag: info.category.split(' ')[0], info });
     }
     const islandText = {
-      central: '南瓜岛的城市中心：5×5 街区路网，美国大厦、美国博物馆、世界遗产博物馆、江苏路第二小学、如家酒店、罗森便利店与建筑工地都在这里。',
-      east: '东林岛：四季酒店与它的游乐园（摩天轮、旋转木马、过山车），东侧是起伏的林地。',
-      north: '北原岛：雾林路边的幽灵博物馆，以及大片草原、松林与野兔。',
+      central: '南瓜岛的城市中心：5×5 街区路网，美国大厦 1 号楼（办公）与 2 号楼（酒店）、美国博物馆、世界遗产博物馆、江苏路第二小学、如家酒店、罗森便利店与建筑工地都在这里。',
+      east: '东林岛：四季酒店与它的游乐园（摩天轮、旋转木马、过山车），东侧是起伏的林地，北端的明珠大桥通往东方明珠岛。',
+      north: '北原岛：雾林路边的幽灵博物馆、北原路旁的天文馆，以及大片草原、松林与野兔。',
+      pearl: '东方明珠岛：粉红明珠串起的东方明珠电视塔与香槟金色的福来大厦隔陆家嘴路相望，经明珠大桥与东林岛相连。',
       west: '西岭岛：科技馆坐落在西岭路旁，西侧山岭上松林茂密，常有小鹿出没。',
       south: '南湾岛：海边停泊着巨轮造型的海洋博物馆，旁边是贝壳屋顶的海洋美术馆。',
     };

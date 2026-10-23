@@ -19,6 +19,7 @@ uniform vec3 uMoonDir;
 uniform float uDaylight;
 uniform float uSunset;
 uniform float uRain;
+uniform float uStorm;
 uniform float uTime;
 uniform vec3 uDayZenith, uDayHorizon, uSunsetHorizon, uNightZenith, uNightHorizon;
 uniform float uSunDisk;
@@ -46,6 +47,7 @@ void main() {
   // Overcast tint when raining.
   vec3 overcast = mix(vec3(0.36, 0.39, 0.43), vec3(0.55, 0.58, 0.62), horizonT) * (0.15 + 0.85 * uDaylight);
   col = mix(col, overcast, uRain * 0.85);
+  col *= 1.0 - uStorm * 0.45;
 
   // Stars.
   if (uDaylight < 0.6 && y > 0.0) {
@@ -69,13 +71,14 @@ void main() {
 
   // Clouds on a virtual plane.
   if (y > 0.0) {
-    vec2 cuv = dir.xz / (y + 0.12) * 1.6 + vec2(uTime * 0.012, uTime * 0.004);
+    vec2 cuv = dir.xz / (y + 0.12) * 1.6 + vec2(uTime * 0.012, uTime * 0.004) * (1.0 + uStorm * 7.0);
     float n = fbm5(cuv);
-    float coverage = mix(0.56, 0.18, uRain);
+    float coverage = mix(0.56, 0.18, uRain) - uStorm * 0.12;
     float cloud = smoothstep(coverage, coverage + 0.28, n) * smoothstep(0.0, 0.18, y);
     vec3 lit = mix(vec3(1.0), sunCol * 1.15, uSunset * 0.6) * (0.25 + 0.95 * uDaylight);
     vec3 shade = mix(vec3(0.55, 0.6, 0.68), vec3(0.32, 0.34, 0.38), uRain) * (0.08 + 0.8 * uDaylight);
     vec3 cloudCol = mix(lit, shade, smoothstep(0.4, 0.95, n) * 0.8 + uRain * 0.3);
+    cloudCol *= 1.0 - uStorm * smoothstep(0.35, 0.9, n) * 0.6;
     cloudCol += sunCol * pow(sunAmt, 6.0) * 0.4 * uDaylight * (1.0 - uRain);
     col = mix(col, cloudCol, cloud * 0.92);
   }
@@ -96,7 +99,7 @@ export class Sky {
     const v3 = (a) => new THREE.Vector3(a[0], a[1], a[2]);
     this.uniforms = {
       uSunDir: u.uSunDir, uMoonDir: u.uMoonDir, uDaylight: u.uDaylight, uSunset: u.uSunset,
-      uRain: u.uRain, uTime: u.uTime,
+      uRain: u.uRain, uStorm: u.uStorm, uTime: u.uTime,
       uDayZenith: { value: v3(SKY.dayZenith) }, uDayHorizon: { value: v3(SKY.dayHorizon) },
       uSunsetHorizon: { value: v3(SKY.sunsetHorizon) },
       uNightZenith: { value: v3(SKY.nightZenith) }, uNightHorizon: { value: v3(SKY.nightHorizon) },
@@ -129,7 +132,7 @@ export class Sky {
   /** Re-bake the environment map when lighting changed noticeably. */
   updateEnvironment(force = false) {
     const u = this.ctx.uniforms;
-    const key = [u.uDaylight.value.toFixed(2), u.uSunset.value.toFixed(2), u.uRain.value.toFixed(2),
+    const key = [u.uDaylight.value.toFixed(2), u.uSunset.value.toFixed(2), u.uRain.value.toFixed(2), u.uStorm.value.toFixed(2),
       u.uSunDir.value.x.toFixed(1), u.uSunDir.value.z.toFixed(1)].join('|');
     if (!force && key === this._lastKey) return false;
     this._lastKey = key;

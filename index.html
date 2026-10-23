@@ -35,6 +35,7 @@
       <div class="seg" data-group="weather">
         <button data-value="sunny" class="active">晴天</button>
         <button data-value="rain">雨天</button>
+        <button data-value="typhoon">台风</button>
       </div>
     </section>
     <section>
@@ -76,7 +77,6 @@
     <div class="actions"><button class="primary focus-btn">环绕观察</button></div>
   </section>
 
-  <div id="hint"></div>
 
   <nav id="nav" aria-label="视角控制">
     <button data-hold="zoom" data-v="1" aria-label="放大" title="放大">
@@ -89,6 +89,8 @@
       <svg viewBox="0 0 24 24"><path d="M12 5a7 7 0 1 0 6.7 9h-2.1A5 5 0 1 1 12 7v3l4.5-4L12 2z"/></svg></button>
     <button id="compass" aria-label="朝北复位" title="朝北复位">
       <svg viewBox="0 0 24 24"><path class="n" d="M12 3l4 9h-8z"/><path class="s" d="M12 21l-4-9h8z"/></svg></button>
+    <button id="nav-toggle" aria-label="收起 / 展开按钮" title="收起 / 展开按钮">
+      <svg viewBox="0 0 24 24"><path d="M9.3 5.3 8 6.7l5.3 5.3L8 17.3l1.3 1.4L16 12z"/></svg></button>
   </nav>
   <div id="vbtns" hidden>
     <button data-v="1" aria-label="上升">▲</button>

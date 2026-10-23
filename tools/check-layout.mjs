@@ -10,7 +10,8 @@ import { IslandField } from '../js/world/IslandField.js';
 const FOOTPRINTS = {
   americaTower: [36, 33], americaMuseum: [52, 42], heritageMuseum: [33, 36], school: [46, 58],
   homeInn: [40, 22], fourSeasons: [68, 98], ghostMuseum: [46, 46], oceanMuseum: [74, 26],
-  oceanGallery: [40, 34], scienceMuseum: [60, 60],
+  oceanGallery: [40, 34], scienceMuseum: [60, 60], americaTower2: [36, 33], planetarium: [116, 40],
+  orientalPearl: [70, 70], fulaiTower: [40, 40],
 };
 
 const t0 = Date.now();

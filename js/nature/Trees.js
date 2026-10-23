@@ -222,8 +222,9 @@ function makeMaterial(ctx, atlas, swayAmount) {
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = ctx.uniforms.uTime;
     shader.uniforms.uRain = ctx.uniforms.uRain;
+    shader.uniforms.uStorm = ctx.uniforms.uStorm;
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nuniform float uTime; uniform float uRain;')
+      .replace('#include <common>', '#include <common>\nuniform float uTime; uniform float uRain; uniform float uStorm;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         #ifdef USE_INSTANCING
           vec2 ip = vec2(instanceMatrix[3][0], instanceMatrix[3][2]);
@@ -231,10 +232,11 @@ function makeMaterial(ctx, atlas, swayAmount) {
           vec2 ip = vec2(0.0);
         #endif
         float hgt = max(position.y - 1.0, 0.0);
-        float wind = (1.0 + uRain * 1.5) * ${swayAmount.toFixed(4)};
+        float wind = (1.0 + uRain * 1.5 + uStorm * 5.0) * ${swayAmount.toFixed(4)};
         float sway = sin(uTime * 1.1 + ip.x * 0.13 + ip.y * 0.11) * 0.6 + sin(uTime * 2.3 + ip.x * 0.3) * 0.25;
         transformed.x += sway * hgt * hgt * wind;
         transformed.z += sway * hgt * hgt * wind * 0.5;
+        transformed.x += hgt * hgt * uStorm * ${(swayAmount * 4).toFixed(4)};
         transformed += normal * sin(uTime * 6.0 + position.x * 3.0 + position.z * 2.0) * 0.03 * step(1.5, position.y) * (1.0 + uRain);`);
     // Keep the spherical crown normals on both faces of each card.
     shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>',

@@ -26,6 +26,26 @@ float swell(vec2 p, float t, out vec2 slope) {
   }
   return h;
 }
+
+// Typhoon sea: steep Gerstner waves running with the wind (+x). Returns (dx, height, dz) and the slope.
+vec3 stormWaves(vec2 p, float t, out vec2 slope) {
+  vec3 o = vec3(0.0); slope = vec2(0.0);
+  vec2 d[4]; float L[4]; float A[4];
+  d[0] = normalize(vec2(1.0, 0.25)); L[0] = 74.0; A[0] = 1.5;
+  d[1] = normalize(vec2(0.85, -0.5)); L[1] = 47.0; A[1] = 0.85;
+  d[2] = normalize(vec2(0.7, 0.7)); L[2] = 29.0; A[2] = 0.45;
+  d[3] = normalize(vec2(1.0, -0.1)); L[3] = 17.0; A[3] = 0.22;
+  for (int i = 0; i < 4; i++) {
+    float k = 6.28318 / L[i];
+    float w = sqrt(9.8 * k);
+    float ph = k * dot(d[i], p) - w * t;
+    float q = 0.8 / (k * A[i] * 4.0);
+    o.xz += d[i] * q * A[i] * cos(ph);
+    o.y += A[i] * sin(ph);
+    slope += d[i] * A[i] * k * cos(ph);
+  }
+  return o;
+}
 `;
 
 const WATER_VS = /* glsl */`
@@ -36,7 +56,9 @@ uniform float uTerrainSize;
 uniform float uMaxDepth;
 uniform float uTime;
 uniform float uSwell;
+uniform float uStorm;
 varying vec3 vWorldPos;
+varying vec2 vBaseXZ;
 varying vec2 vSimUv;
 varying float vSimMask;
 varying float vSwellAmp;
@@ -55,6 +77,15 @@ void main() {
   float amp = uSwell * smoothstep(0.3, 6.0, depth);
   vec2 sl;
   h += swell(wp.xz, uTime, sl) * amp;
+  vBaseXZ = wp.xz;
+  if (uStorm > 0.001) {
+    // Only the dense inner grid is displaced; the coarse outer ring keeps the storm in its normals.
+    float edgeFade = 1.0 - smoothstep(0.8, 0.97, max(abs(position.x), abs(position.z)) / ${(WATER.simSize / 2).toFixed(1)});
+    float sAmp = uStorm * smoothstep(0.5, 8.0, depth);
+    vec3 so = stormWaves(wp.xz, uTime, sl);
+    wp.xz += so.xz * sAmp * edgeFade;
+    h += so.y * sAmp * edgeFade;
+  }
   wp.y += h;
   vWorldPos = wp.xyz;
   vSimUv = suv;
@@ -78,6 +109,7 @@ uniform float uTerrainSize;
 uniform float uMaxDepth;
 uniform float uTime;
 uniform float uRain;
+uniform float uStorm;
 uniform float uDaylight;
 uniform float uExposure;
 uniform float uWaveSlope;
@@ -96,6 +128,7 @@ uniform vec3 uSunDir;
 uniform vec3 uSunColor;
 uniform vec3 uAmbient;
 varying vec3 vWorldPos;
+varying vec2 vBaseXZ;
 varying vec2 vSimUv;
 varying float vSimMask;
 varying float vSwellAmp;
@@ -184,6 +217,14 @@ void main() {
   vec2 slope;
   swell(vWorldPos.xz, uTime, slope);
   slope *= vSwellAmp;
+  float stormAmp = uStorm * smoothstep(0.5, 8.0, depth);
+  float stormH = 0.0;
+  if (stormAmp > 0.001) {
+    vec2 ss;
+    vec3 so = stormWaves(vBaseXZ, uTime, ss);
+    slope += ss * stormAmp;
+    stormH = so.y * stormAmp;
+  }
   float lostVar;
   float rough = uWaveSlope * uWind * (0.45 + 0.55 * calm);
   slope += detailSlope(vWorldPos.xz, footprint, lostVar) * rough;
@@ -205,6 +246,7 @@ void main() {
   // --- Water body: in-scattered color over the refracted seabed, attenuated per channel ---
   vec3 waterCol = mix(uShallow, uMid, smoothstep(0.6, 5.0, depth));
   waterCol = mix(waterCol, uDeep, smoothstep(5.0, 15.0, depth));
+  waterCol = mix(waterCol, vec3(0.035, 0.1, 0.115), uStorm * 0.55);
   // Subsurface-ish brightening on wave faces turned towards the viewer.
   float sss = pow(clamp(dot(V, -normalize(vec3(N.x, 0.25, N.z))), 0.0, 1.0), 3.0) * 0.3;
   // Facets tilted towards the sun read slightly lighter, so ripples stay readable from above
@@ -218,6 +260,9 @@ void main() {
   float path = depth * (1.0 + 1.0 / max(V.y, 0.15));
   // At night the stylized moon/hemi lighting would make the seabed glow turquoise through the shallows.
   vec3 transmit = exp(-uAbsorb * path) * (1.0 - uRain * 0.35) * mix(0.45, 1.0, uDaylight);
+  // The seabed mesh ends at the terrain border: fade the refracted view out well before it.
+  vec2 edgeD = abs(duv - 0.5);
+  transmit *= 1.0 - smoothstep(0.36, 0.47, max(edgeD.x, edgeD.y));
   vec3 below = mix(inscatter, refr, transmit);
 
   // --- Reflection (offset along the screen axes; the mirror texture is flipped horizontally) ---
@@ -241,8 +286,8 @@ void main() {
   col += aces(uSunColor * spec * uSpecular * sunUp * (1.0 - uRain * 0.85));
 
   // --- Shore foam ---
-  float foamBand = smoothstep(0.9, 0.05, depth);
-  float waveLines = sin(depth * 9.0 - uTime * 2.2 + vnoise(vWorldPos.xz * 0.4) * 4.0) * 0.5 + 0.5;
+  float foamBand = smoothstep(0.9 + uStorm * 3.2, 0.05, depth);
+  float waveLines = sin(depth * (9.0 - uStorm * 6.0) - uTime * (2.2 + uStorm * 1.8) + vnoise(vWorldPos.xz * 0.4) * 4.0) * 0.5 + 0.5;
   float foamNoise = vnoise(vWorldPos.xz * 1.3 + uTime * 0.3) * vnoise(vWorldPos.xz * 0.5 - uTime * 0.2);
   float foam = foamBand * smoothstep(0.35, 0.85, waveLines * 0.6 + foamNoise * 0.9);
   foam = max(foam, smoothstep(0.25, 0.0, depth) * 0.8);
@@ -250,6 +295,13 @@ void main() {
   float sigma = sqrt(uWaveVar.x + uWaveVar.y) * rough;
   float crest = smoothstep(2.3 * sigma, 3.4 * sigma, length(slope)) * smoothstep(3.0, 8.0, depth) * (1.0 - smoothstep(150.0, 400.0, dist));
   foam = max(foam, crest * (0.35 + uRain * 0.4) * vnoise(vWorldPos.xz * 0.8 + uTime * 0.5));
+  if (uStorm > 0.001) {
+    // Breaking crests and wind-blown foam streaks.
+    float breakers = smoothstep(1.0, 2.2, stormH) * vnoise(vWorldPos.xz * 0.35 + uTime * 0.8);
+    vec2 sp = vec2(dot(vBaseXZ, vec2(0.97, 0.24)) * 0.05 - uTime * 0.35, dot(vBaseXZ, vec2(-0.24, 0.97)) * 0.7);
+    float streaks = smoothstep(0.62, 0.85, vnoise(sp) * 0.7 + vnoise(sp * 2.3 + 4.1) * 0.4);
+    foam = max(foam, uStorm * smoothstep(3.0, 8.0, depth) * (breakers * 1.3 + streaks * 0.45));
+  }
   col = mix(col, aces(lightCol * 1.05), clamp(foam, 0.0, 1.0) * 0.85);
 
   float alpha = smoothstep(0.0, 0.12, depth);
@@ -289,7 +341,7 @@ export class Water {
       uShallow: { value: new THREE.Vector3(...WATER.shallowColor) },
       uMid: { value: new THREE.Vector3(...WATER.midColor) },
       uDeep: { value: new THREE.Vector3(...WATER.deepColor) },
-      uExposure: { value: 1 }, uSwell: { value: 1 }, uWaveSlope: { value: WAVES.slope }, uWind: { value: 1 },
+      uExposure: { value: 1 }, uSwell: { value: 1 }, uStorm: { value: 0 }, uWaveSlope: { value: WAVES.slope }, uWind: { value: 1 },
       uWaveTiles: { value: new THREE.Vector2(WAVES.tileA, WAVES.tileB) },
       uWaveDecode: { value: new THREE.Vector2() },
       uWaveVar: { value: new THREE.Vector2(WAVES.slopeVarA, WAVES.slopeVarB) },
@@ -310,6 +362,7 @@ export class Water {
     // Share live uniforms with the rest of the world.
     this.uniforms.uTime = u.uTime;
     this.uniforms.uRain = u.uRain;
+    this.uniforms.uStorm = u.uStorm;
     this.uniforms.uDaylight = u.uDaylight;
     this.uniforms.uSunDir = u.uSunDir;
     this.uniforms.uSunColor = u.uSunColor;
@@ -384,7 +437,7 @@ export class Water {
     this.uniforms.uExposure.value = this.ctx.renderer.toneMappingExposure;
     const rain = this.ctx.uniforms.uRain.value;
     this.uniforms.uSwell.value = 1 + rain * 0.9;
-    this.uniforms.uWind.value = 1 + rain * 0.35;
+    this.uniforms.uWind.value = 1 + rain * 0.35 + this.ctx.uniforms.uStorm.value * 0.9;
   }
 
   /** Render reflection and refraction textures. Call before the main render. */

@@ -1,4 +1,4 @@
-// DOM UI: settings panel, info card, places list, loader, hints and touch joystick.
+// DOM UI: collapsible settings panel and nav buttons, info card, places list, loader and gesture tips.
 import { IS_MOBILE } from '../config/world.config.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -16,8 +16,8 @@ export class UI {
     this.panel = $('#panel');
     this.loader = $('#loader');
     this.isTouch = IS_MOBILE || matchMedia('(pointer: coarse)').matches;
-    if (window.innerWidth <= 760) this.panel.classList.add('collapsed');
-    $('#panel-toggle').addEventListener('click', () => this.panel.classList.toggle('collapsed'));
+    this._setupCollapsible(this.panel, $('#panel-toggle'), 'panel', this.isTouch || window.innerWidth <= 1180);
+    this._setupCollapsible($('#nav'), $('#nav-toggle'), 'nav', this.isTouch);
     $('.close', this.info).addEventListener('click', () => { this.hideInfo(); this.onCloseInfo?.(); });
     this._setupTitle();
   }
@@ -40,6 +40,16 @@ export class UI {
     apply(this._store('title') !== '0');
     $('.hide-title', title).addEventListener('click', () => apply(false));
     box.addEventListener('change', () => apply(box.checked));
+  }
+
+  /** Toggle a collapsible element; the choice is remembered, `collapsedByDefault` applies on first visit. */
+  _setupCollapsible(el, button, key, collapsedByDefault) {
+    const stored = this._store(key);
+    el.classList.toggle('collapsed', stored === null ? collapsedByDefault : stored === '0');
+    button.addEventListener('click', () => {
+      const collapsed = el.classList.toggle('collapsed');
+      this._store(key, collapsed ? '0' : '1');
+    });
   }
 
   showContextLost() { $('#lost').hidden = false; }
@@ -68,7 +78,7 @@ export class UI {
         ['双指捏合', '以双指中心缩放'],
         ['双指旋转', '旋转视角 360°'],
         ['双指上下滑', '调整俯仰角度'],
-        ['右侧按钮', '+ / − 缩放，↺ ↻ 旋转，指南针复位朝北'],
+        ['右侧按钮', '+ / − 缩放，↺ ↻ 旋转，指南针复位朝北，› 收起 / 展开按钮栏'],
         ['点击 / 双击', '查看名称 / 飞到该处'],
       ] : [
         ['左键拖动', '旋转视角 360°（上下拖动调整俯仰）'],
@@ -152,7 +162,7 @@ export class UI {
       b.innerHTML = `${p.name}${p.tag ? `<small>${p.tag}</small>` : ''}`;
       b.addEventListener('click', () => {
         onPick(p);
-        if (window.innerWidth <= 760) this.panel.classList.add('collapsed');
+        if (window.innerWidth <= 1180 || this.isTouch) this.panel.classList.add('collapsed');
       });
       root.appendChild(b);
     }
@@ -180,17 +190,6 @@ export class UI {
     const walk = mode === 'walk';
     $('#vbtns').hidden = !walk;
     this.info.classList.toggle('with-joystick', walk && this.isTouch);
-    if (!this.walkZone) {
-      this.walkZone = document.createElement('div');
-      this.walkZone.className = 'walk-zone';
-      this.walkZone.textContent = '按住此区域移动';
-      document.body.appendChild(this.walkZone);
-    }
-    this.walkZone.hidden = !(walk && this.isTouch);
-    const hint = $('#hint');
-    hint.textContent = walk
-      ? 'WASD 移动 · 拖动环视（向左拖向左看）· 滚轮变焦 · E/Q 升降 · Shift 奔跑 · 双击传送'
-      : '左键拖动旋转 · 右键拖动平移 · 滚轮缩放 · WASD 移动 · 点击查看名称 · 双击飞到该处';
     if (this._controls) this.showTips(mode);
   }
 

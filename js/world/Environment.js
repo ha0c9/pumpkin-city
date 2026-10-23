@@ -1,4 +1,4 @@
-// Time of day, weather (sunny / rain), lights, fog and GPU rain particles.
+// Time of day, weather (sunny / rain / typhoon), lights, fog, lightning and GPU rain particles.
 import { QUALITY, START_TIME, SKY, WATER } from '../config/world.config.js';
 import { smoothstep, lerp, mulberry32 } from '../core/Utils.js';
 import { LAYER_DETAIL } from './Water.js';
@@ -12,15 +12,16 @@ uniform vec3 uCenter;
 uniform float uBox;
 uniform float uHeight;
 uniform float uRain;
+uniform float uStorm;
 varying float vAlpha;
 void main() {
   vec3 p = position;
-  float speed = 22.0 + fract(p.x * 13.17) * 6.0;
+  float speed = 22.0 + fract(p.x * 13.17) * 6.0 + uStorm * 10.0;
   p.y = mod(p.y - uTime * speed, uHeight);
-  p.x = mod(p.x - uCenter.x + uTime * 1.5, uBox) - uBox * 0.5 + uCenter.x;
+  p.x = mod(p.x - uCenter.x + uTime * (1.5 + uStorm * 24.0), uBox) - uBox * 0.5 + uCenter.x;
   p.z = mod(p.z - uCenter.z, uBox) - uBox * 0.5 + uCenter.z;
   p.y += uCenter.y - uHeight * 0.45;
-  p += aEnd * vec3(0.04, 0.55, 0.0);
+  p += aEnd * vec3(0.04 + uStorm * 0.75, 0.55 + uStorm * 0.25, uStorm * 0.12);
   float visible = step(fract(position.z * 7.31), uRain);
   vAlpha = visible * (0.25 + 0.3 * aEnd);
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
@@ -45,6 +46,9 @@ export class Environment {
     this.timeSpeed = 0.25; // in-game hours per real second when auto cycling
     this.weather = 'sunny';
     this.rain = 0;
+    this.storm = 0;
+    this.flash = 0;
+    this._nextFlash = 3;
     this.listeners = [];
     this.rng = mulberry32(7);
 
@@ -86,7 +90,7 @@ export class Environment {
     geo.setAttribute('aEnd', new THREE.BufferAttribute(end, 1));
     this.rainUniforms = {
       uTime: this.ctx.uniforms.uTime, uCenter: { value: new THREE.Vector3() }, uBox: { value: box },
-      uHeight: { value: height }, uRain: this.ctx.uniforms.uRain, uColor: { value: new THREE.Color(0xaabbcc) },
+      uHeight: { value: height }, uRain: this.ctx.uniforms.uRain, uStorm: this.ctx.uniforms.uStorm, uColor: { value: new THREE.Color(0xaabbcc) },
     };
     const mat = new THREE.ShaderMaterial({
       vertexShader: RAIN_VS, fragmentShader: RAIN_FS, uniforms: this.rainUniforms,
@@ -110,9 +114,26 @@ export class Environment {
     if (this.autoTime) {
       this.time = (this.time + dt * this.timeSpeed) % 24;
     }
-    const target = this.weather === 'rain' ? 1 : 0;
+    const target = this.weather === 'sunny' ? 0 : 1;
     this.rain += (target - this.rain) * Math.min(1, dt * 0.6);
     if (Math.abs(target - this.rain) < 0.002) this.rain = target;
+    const stormTarget = this.weather === 'typhoon' ? 1 : 0;
+    this.storm += (stormTarget - this.storm) * Math.min(1, dt * 0.35);
+    if (Math.abs(stormTarget - this.storm) < 0.002) this.storm = stormTarget;
+    // Lightning: a double flicker every few seconds during the typhoon.
+    this.flash = Math.max(0, this.flash - dt * 3.2);
+    if (this.storm > 0.6) {
+      this._nextFlash -= dt;
+      if (this._nextFlash <= 0) {
+        this.flash = 1;
+        this._flicker = 0.18;
+        this._nextFlash = 3 + this.rng() * 7;
+      }
+      if (this._flicker > 0) {
+        this._flicker -= dt;
+        if (this._flicker <= 0) this.flash = Math.max(this.flash, 0.8);
+      }
+    }
     this.apply(dt, false, camera, focus);
   }
 
@@ -128,7 +149,8 @@ export class Environment {
     u.uSunset.value = sunset;
     u.uNight.value = 1 - smoothstep(-0.06, 0.1, sunDir.y);
     u.uRain.value = this.rain;
-    const rain = this.rain;
+    u.uStorm.value = this.storm;
+    const rain = this.rain, storm = this.storm;
 
     // Sun / moon light.
     const sunUp = sunDir.y > -0.02;
@@ -136,7 +158,7 @@ export class Environment {
     const warm = new THREE.Color().setRGB(1.0, lerp(0.55, 0.96, smoothstep(0.0, 0.4, sunDir.y)), lerp(0.3, 0.9, smoothstep(0.0, 0.45, sunDir.y)));
     if (sunUp) {
       this.sun.color.copy(warm);
-      this.sun.intensity = 2.8 * smoothstep(-0.02, 0.12, sunDir.y) * (1 - rain * 0.78);
+      this.sun.intensity = 2.8 * smoothstep(-0.02, 0.12, sunDir.y) * (1 - rain * 0.78) * (1 - storm * 0.6);
     } else {
       this.sun.color.setRGB(0.55, 0.65, 0.95);
       this.sun.intensity = 0.32 * smoothstep(-0.02, 0.2, u.uMoonDir.value.y) * (1 - rain * 0.7);
@@ -152,7 +174,7 @@ export class Environment {
     const skyNight = new THREE.Color(0x1a2850);
     this.hemi.color.copy(skyNight).lerp(skyDay, daylight);
     this.hemi.groundColor.setRGB(0.25, 0.27, 0.18).multiplyScalar(0.25 + 0.75 * daylight);
-    this.hemi.intensity = lerp(0.3, 0.42, daylight) * (1 - rain * 0.1);
+    this.hemi.intensity = lerp(0.3, 0.42, daylight) * (1 - rain * 0.1) * (1 - storm * 0.3) + this.flash * 1.6;
     const amb = this.hemi.color.clone().multiplyScalar(this.hemi.intensity * 0.6);
     u.uAmbient.value.set(amb.r, amb.g, amb.b);
     u.uWaterTint.value.set(...WATER.midColor).multiplyScalar(1.4).addScalar(0.25);
@@ -163,10 +185,12 @@ export class Environment {
     const fogNight = new THREE.Color().setRGB(...SKY.nightHorizon);
     const fog = fogNight.clone().lerp(fogDay.lerp(fogSunset, sunset * 0.6), daylight);
     fog.lerp(new THREE.Color(0.5, 0.53, 0.57).multiplyScalar(0.2 + 0.8 * daylight), rain * 0.8);
+    fog.lerp(new THREE.Color(0.24, 0.27, 0.3).multiplyScalar(0.2 + 0.8 * daylight), storm * 0.7);
+    fog.lerp(new THREE.Color(0.75, 0.8, 0.9), this.flash * 0.5);
     this.ctx.scene.fog.color.copy(fog);
-    this.ctx.scene.fog.density = lerp(0.00055, 0.0032, rain);
+    this.ctx.scene.fog.density = lerp(lerp(0.00055, 0.0032, rain), 0.0034, storm);
 
-    this.ctx.renderer.toneMappingExposure = lerp(1.45, 1.0, daylight);
+    this.ctx.renderer.toneMappingExposure = lerp(1.45, 1.0, daylight) + this.flash * 1.3;
 
     // Rain particles.
     this.rainMesh.visible = rain > 0.01;
@@ -183,7 +207,7 @@ export class Environment {
   /** Raindrops feed the ripple simulation around the camera focus. */
   feedRain(water, focus) {
     if (this.rain < 0.05) return;
-    const n = Math.floor(10 * this.rain);
+    const n = Math.floor(10 * this.rain + 14 * this.storm);
     for (let i = 0; i < n; i++) {
       const x = focus.x + (this.rng() - 0.5) * 160;
       const z = focus.z + (this.rng() - 0.5) * 160;
