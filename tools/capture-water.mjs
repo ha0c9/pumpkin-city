@@ -17,6 +17,8 @@ const SHOTS = [
   { name: 'low-side', target: [320, 2, 300], radius: 45, theta: 2.69, phi: 1.40, hour: 15.5 },
   { name: 'shore', target: [265, 2, 80], radius: 110, theta: 1.2, phi: 1.2, hour: 13 },
   { name: 'sunset', target: [320, 2, 300], radius: 140, theta: 1.2, phi: 1.38, hour: 17.6 },
+  { name: 'rain', target: [320, 2, 300], radius: 60, theta: 1.12, phi: 1.3, hour: 14, weather: 'rain' },
+  { name: 'night', target: [265, 2, 80], radius: 160, theta: 1.2, phi: 1.25, hour: 22 },
 ];
 
 mkdirSync(outDir, { recursive: true });
@@ -47,6 +49,8 @@ for (const s of SHOTS.filter((x) => !only || only.includes(x.name))) {
     c.phi = c.goalPhi = s.phi;
     app.env.autoTime = false;
     app.env.setTime(s.hour);
+    app.env.setWeather(s.weather || 'sunny');
+    app.env.rain = s.weather === 'rain' ? 1 : 0;
   }, s);
   // Let the ripple simulation, shadows and reflections settle.
   await new Promise((r) => setTimeout(r, 6000));
