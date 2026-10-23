@@ -1,16 +1,17 @@
 // Places landmark buildings and randomly assigned facilities on city lots.
 import { LANDMARKS, LOTS, RANDOM_FACILITIES } from '../config/city.layout.js';
 import { getBuildingType } from '../core/Registry.js';
-import { mulberry32 } from '../core/Utils.js';
+import { mulberry32, mergeSimple } from '../core/Utils.js';
 import '../buildings/index.js';
 
 const THREE = window.THREE;
 
 const DEFAULT_NAMES = {
-  school: { name: '南瓜岛小学', nameEn: 'Pumpkin Island School', description: '三层教学楼、钟楼、200 米环形跑道与升旗台的社区小学。' },
-  pocketPark: { name: '口袋公园', nameEn: 'Pocket Park', description: '喷泉、长椅与花坛组成的街区绿地，预留给未来建筑。' },
+  school: { name: '江苏路第二小学', nameEn: 'Jiangsu Road No.2 Primary School', description: '校门朝向江苏路，设有传达室。四层教学楼、钟楼、200 米环形跑道、足球场、篮球场与升旗台。' },
+  pocketPark: { name: '城市公园', nameEn: 'City Park', description: '草坪、步道、喷泉、儿童游乐场与花坛组成的街区公园，预留给未来建筑。' },
   cornerGarden: { name: '街角花园', nameEn: 'Corner Garden', description: '临街小花园，可在后续版本替换为新的设施。' },
 };
+const MINOR_TYPES = ['pocketPark', 'cornerGarden', 'constructionSite', 'convenienceStore'];
 
 function shuffle(arr, rng) {
   const a = arr.slice();
@@ -19,6 +20,37 @@ function shuffle(arr, rng) {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+/**
+ * Merge a building's static, single-material, opaque meshes into one mesh per material (fewer draw calls).
+ * Objects flagged `userData.dynamic` (and their subtrees) are left untouched so they can still animate.
+ */
+function mergeStatic(root) {
+  root.updateMatrixWorld(true);
+  const groups = new Map();
+  const visit = (o) => {
+    if (o.userData.dynamic) return;
+    for (const c of o.children.slice()) visit(c);
+    if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material) || o.material.transparent || o.children.length) return;
+    const key = `${o.material.uuid}|${o.castShadow}|${o.receiveShadow}`;
+    if (!groups.has(key)) groups.set(key, { material: o.material, cast: o.castShadow, receive: o.receiveShadow, items: [] });
+    groups.get(key).items.push(o);
+  };
+  visit(root);
+  for (const grp of groups.values()) {
+    if (grp.items.length < 2) continue;
+    const geos = grp.items.map((o) => {
+      const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+      g.applyMatrix4(o.matrixWorld);
+      return g;
+    });
+    const merged = new THREE.Mesh(mergeSimple(geos), grp.material);
+    merged.castShadow = grp.cast; merged.receiveShadow = grp.receive;
+    for (const o of grp.items) o.parent.remove(o);
+    geos.forEach((g) => g.dispose());
+    root.add(merged);
+  }
 }
 
 export class City {
@@ -36,20 +68,19 @@ export class City {
 
     const pools = { large: shuffle(LOTS.large, rng), small: shuffle(LOTS.small, rng) };
     let counter = 0;
+    const fromLot = (type, lot) => ({ type, id: `${type}-${++counter}`, position: lot.position, rotation: lot.rotation, size: lot.size, footprint: lot.size });
     for (const pick of RANDOM_FACILITIES.picks) {
-      for (let i = 0; i < pick.count && pools[pick.lot].length; i++) {
-        const lot = pools[pick.lot].shift();
-        this.place({ type: pick.type, id: `${pick.type}-${++counter}`, position: lot.position, rotation: lot.rotation }, rng);
-      }
+      for (let i = 0; i < pick.count && pools[pick.lot].length; i++) this.place(fromLot(pick.type, pools[pick.lot].shift()), rng);
     }
-    for (const lot of pools.large) this.place({ type: 'pocketPark', id: `park-${++counter}`, position: lot.position, rotation: lot.rotation }, rng);
-    for (const lot of pools.small) this.place({ type: 'cornerGarden', id: `garden-${++counter}`, position: lot.position, rotation: lot.rotation }, rng);
+    for (const lot of pools.large) this.place(fromLot('pocketPark', lot), rng);
+    for (const lot of pools.small) this.place({ ...fromLot('cornerGarden', lot), footprint: null }, rng);
   }
 
-  /** Create a building from a spec ({ type, position: [x, z], rotation, ... }) and add it to the world. */
+  /** Create a building from a spec ({ type, position: [x, z], rotation, size?, ... }) and add it to the world. */
   place(spec, rng = Math.random) {
     const def = getBuildingType(spec.type);
     const obj = def.create(this.ctx, spec, rng);
+    mergeStatic(obj);
     const [x, z] = spec.position;
     const y = this.terrain.heightAt(x, z);
     const rot = spec.rotation || 0;
@@ -75,6 +106,7 @@ export class City {
       radius: Math.max(height * 1.25, Math.max(fp[0], fp[1]) * 1.3, 30),
       landmark: !['pocketPark', 'cornerGarden'].includes(spec.type),
       featured: !!spec.name,
+      minor: MINOR_TYPES.includes(spec.type),
     };
     obj.userData.pick = info;
     obj.traverse((o) => { o.userData.pick = info; });

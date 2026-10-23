@@ -2,8 +2,16 @@
 // To add a new building: create js/buildings/MyBuilding.js that calls registerBuilding('myType', {...}),
 // import it below, then place it in js/config/city.layout.js (LANDMARKS or RANDOM_FACILITIES).
 import './AmericaTower.js';
+import './AmericaMuseum.js';
 import './HeritageMuseum.js';
+import './GhostMuseum.js';
+import './OceanMuseum.js';
+import './OceanGallery.js';
+import './HomeInn.js';
+import './FourSeasons.js';
+import './ScienceMuseum.js';
 import './ConvenienceStore.js';
 import './School.js';
+import './ConstructionSite.js';
 import './Park.js';
 import './GltfModel.js';
