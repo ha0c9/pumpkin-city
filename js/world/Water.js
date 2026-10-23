@@ -112,8 +112,10 @@ vec2 detailSlope(vec2 p, float t, float dist) {
   s += R1 * waveTex((R1 * p) / 23.0 + vec2(-t * 0.016, t * 0.012)) * 0.75;
   float near = 1.0 - smoothstep(60.0, 260.0, dist);
   s += R2 * waveTex((R2 * p) / 8.3 + vec2(t * 0.031, -t * 0.024)) * 0.6 * (0.35 + 0.65 * near);
-  float nearer = 1.0 - smoothstep(20.0, 90.0, dist);
-  s += R3 * waveTex((R3 * p) / 3.1 + vec2(-t * 0.05, -t * 0.043)) * 0.45 * nearer;
+  float nearer = 1.0 - smoothstep(35.0, 160.0, dist);
+  s += R3 * waveTex((R3 * p) / 3.1 + vec2(-t * 0.05, -t * 0.043)) * 0.5 * nearer;
+  float closest = 1.0 - smoothstep(10.0, 55.0, dist);
+  s += R1 * R3 * waveTex((R2 * p) / 1.25 + vec2(t * 0.09, t * 0.07)) * 0.32 * closest;
   return s * uWaveSlope * uWind;
 }
 
@@ -160,7 +162,7 @@ void main() {
   vec2 slope;
   swell(vWorldPos.xz, uTime, slope);
   slope *= vSwellAmp;
-  slope += detailSlope(vWorldPos.xz, uTime, dist) * (0.35 + 0.65 * calm);
+  slope += detailSlope(vWorldPos.xz, uTime, dist) * (0.55 + 0.45 * calm);
   if (vSimMask > 0.0) {
     vec2 simN = texture2D(uSimTex, vSimUv).ba;
     slope -= simN * vSimMask * 1.4;
@@ -177,7 +179,9 @@ void main() {
   vec3 lightCol = uAmbient + uSunColor * sunUp * 0.6;
   // Subsurface-ish brightening on wave faces turned towards the viewer.
   float sss = pow(clamp(dot(V, -normalize(vec3(N.x, 0.25, N.z))), 0.0, 1.0), 3.0) * 0.25;
-  vec3 scatter = aces(waterCol * lightCol * (1.0 + sss));
+  // Facets tilted towards the sun / sky read lighter, giving visible fine ripples even from above.
+  float facet = dot(N.xz, normalize(uSunDir.xz + vec2(0.35, 0.25))) * 2.4 * (1.0 - smoothstep(120.0, 500.0, dist));
+  vec3 scatter = aces(waterCol * lightCol * (1.0 + sss) * clamp(1.0 + facet, 0.6, 1.4));
 
   // --- Refraction ---
   vec2 screenUv = gl_FragCoord.xy / uResolution;

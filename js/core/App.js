@@ -1,5 +1,5 @@
 // Application bootstrap: renderer, world assembly, render loop.
-import { QUALITY, IS_MOBILE } from '../config/world.config.js';
+import { QUALITY } from '../config/world.config.js';
 import { OccupancyMask } from './Mask.js';
 import { CameraControls } from './CameraControls.js';
 import { Interaction } from './Interaction.js';
@@ -12,6 +12,7 @@ import { Bridges } from '../world/Bridges.js';
 import { RoadNetwork } from '../world/Roads.js';
 import { StreetFurniture } from '../world/StreetFurniture.js';
 import { City } from '../world/City.js';
+import { Traffic } from '../world/Traffic.js';
 import { GroundMap } from '../nature/GroundMap.js';
 import { Grass } from '../nature/Grass.js';
 import { Trees } from '../nature/Trees.js';
@@ -39,9 +40,10 @@ export class App {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.shadowMap.autoUpdate = false;
     this.container.appendChild(renderer.domElement);
+    renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); ui.showContextLost(); });
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 5000);
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 7000);
     camera.layers.enable(LAYER_DETAIL);
 
     const ctx = this.ctx = {
@@ -72,9 +74,10 @@ export class App {
     ui.progress(0.55, '建造城市…'); await nextFrame();
     this.city = new City(ctx, this.terrain);
     this.furniture = new StreetFurniture(ctx, [...this.roads.lamps, ...this.bridges.lamps], this.roads.signals);
+    this.traffic = new Traffic(ctx, this.roads, this.bridges, QUALITY.carCount);
 
     ui.progress(0.68, '种植草地与树木…'); await nextFrame();
-    this.ground = new GroundMap(this.terrain, ctx.mask, IS_MOBILE ? 768 : 1024);
+    this.ground = new GroundMap(this.terrain, ctx.mask, QUALITY.groundRes);
     this.grass = new Grass(ctx, this.ground);
     this.trees = new Trees(ctx, this.terrain, this.ground, ctx.mask, [...this.city.treeSpots, ...this.roads.streetTrees]);
     ui.progress(0.82, '小动物入住…'); await nextFrame();
@@ -87,12 +90,13 @@ export class App {
       },
       walkable: (x, z) => (this.terrain.heightAt(x, z) > 0.6 || this.bridges.heightAt(x, z) !== null)
         && this.ctx.mask.hit(x, z, 2, 'building') === null,
+      limit: 780,
     });
-    this.controls.target.set(10, 8, -10);
+    this.controls.target.set(0, 6, -40);
     this.controls.goalTarget.copy(this.controls.target);
-    this.controls.radius = 520; this.controls.goalRadius = 230;
-    this.controls.theta = 0.2; this.controls.goalTheta = 0.65;
-    this.controls.phi = 0.55; this.controls.goalPhi = 1.08;
+    this.controls.radius = 1100; this.controls.goalRadius = 340;
+    this.controls.theta = 0.1; this.controls.goalTheta = 0.55;
+    this.controls.phi = 0.45; this.controls.goalPhi = 1.0;
 
     this.interaction = new Interaction(ctx, { terrain: this.terrain, bridges: this.bridges, water: this.water, controls: this.controls, ui });
     this._labelsAndPlaces();
@@ -118,17 +122,23 @@ export class App {
       const info = b.info;
       if (!info.landmark) continue;
       const top = new THREE.Vector3(b.object.position.x, b.object.position.y + info.height + 3, b.object.position.z);
-      it.addLabel(info.name, info.nameEn, top, info.featured ? 'featured' : 'minor');
-      places.push({ name: info.name, tag: info.category.split(' ')[0], info });
+      it.addLabel(info.name, info.nameEn, top, info.featured && !info.minor ? 'featured' : 'minor');
+      if (info.featured) places.push({ name: info.name, tag: info.category.split(' ')[0], info });
     }
+    const islandText = {
+      central: '南瓜岛的城市中心：5×5 街区路网，美国大厦、美国博物馆、世界遗产博物馆、江苏路第二小学、如家酒店、罗森便利店与建筑工地都在这里。',
+      east: '东林岛：四季酒店与它的游乐园（摩天轮、旋转木马、过山车），东侧是起伏的林地。',
+      north: '北原岛：雾林路边的幽灵博物馆，以及大片草原、松林与野兔。',
+      west: '西岭岛：科技馆坐落在西岭路旁，西侧山岭上松林茂密，常有小鹿出没。',
+      south: '南湾岛：海边停泊着巨轮造型的海洋博物馆，旁边是贝壳屋顶的海洋美术馆。',
+    };
     for (const isl of this.terrain.islands) {
       const h = Math.max(this.terrain.heightAt(isl.x, isl.z), 2);
-      const pos = isl.id === 'central' ? new THREE.Vector3(isl.x - 80, 14, isl.z + 80) : new THREE.Vector3(isl.x, h + 16, isl.z);
-      it.addLabel(isl.name, isl.nameEn, pos, 'island');
+      it.addLabel(isl.name, isl.nameEn, new THREE.Vector3(isl.x, h + 26, isl.z), 'island');
       places.push({ name: isl.name, tag: '岛屿', info: {
         name: isl.name, nameEn: isl.nameEn, category: '岛屿 Island',
-        description: isl.id === 'central' ? '南瓜岛的城市中心：美国大厦、世界遗产博物馆、学校与便利店都在这里。' : '目前以草地、树林和小动物为主，预留未来扩建。',
-        focus: [isl.x, h, isl.z], radius: isl.radius * 2.2,
+        description: islandText[isl.id] || '草地、树林和小动物，预留未来扩建。',
+        focus: [isl.x, h, isl.z], radius: Math.min(520, isl.radius * 2.0),
       } });
     }
     for (const b of this.bridges.items) {
@@ -168,7 +178,9 @@ export class App {
     this.env.update(dt, ctx.camera, focus);
     this.ui.syncTime?.();
     this._updateShadowFrustum();
+    this.water.follow(focus);
     this.env.feedRain(this.water, focus);
+    this.traffic.update(dt, this.time);
     this.grass.update(ctx.camera);
     this.animals.update(dt, this.time);
     const night = u.uNight.value;
