@@ -45,6 +45,10 @@ export const ROADS = [
   // --- 南湾岛 ---
   { id: 'haiyang', name: '海洋路', nameEn: 'Haiyang Rd', from: [0, 368], to: [0, 535], lanes: 2 },
   { id: 'nanwan', name: '南湾路', nameEn: 'Nanwan Rd', from: [-85, 450], to: [125, 450], lanes: 2 },
+
+  // --- 东方明珠岛 ---
+  { id: 'mingzhu', name: '明珠路', nameEn: 'Mingzhu Rd', from: [450, -250], to: [450, -450], lanes: 2 },
+  { id: 'lujiazui', name: '陆家嘴路', nameEn: 'Lujiazui Rd', from: [392, -360], to: [556, -360], lanes: 2 },
 ];
 
 /**
@@ -58,15 +62,22 @@ export const BRIDGES = [
   { id: 'bridge-north', name: '北原斜拉桥', nameEn: 'North Meadow Cable Bridge', from: [0, -130], dir: [0, -1], to: 'north', lanes: 2, style: 'cable' },
   { id: 'bridge-west', name: '西岭大桥', nameEn: 'West Ridge Bridge', from: [-150, 0], dir: [-1, 0], to: 'west', lanes: 4, style: 'beam' },
   { id: 'bridge-south', name: '南湾拱桥', nameEn: 'South Cove Arch Bridge', from: [0, 130], dir: [0, 1], to: 'south', lanes: 2, style: 'arch' },
+  { id: 'bridge-pearl', name: '明珠大桥', nameEn: 'Pearl Cable Bridge', from: [450, -85], dir: [0, -1], to: 'pearl', lanes: 2, style: 'cable' },
 ];
 
 /** Landmark buildings with fixed positions. `type` must be registered in js/buildings/index.js. */
 export const LANDMARKS = [
   {
     type: 'americaTower', id: 'america-tower',
-    name: '美国大厦', nameEn: 'America Tower',
-    description: '南瓜岛最高的玻璃幕墙超高层建筑，高约 146 米，三段退台式造型，顶部设观景冠与航空障碍灯。',
+    name: '美国大厦 1号楼', nameEn: 'America Tower 1 · Offices',
+    description: '美国大厦 1 号楼是办公楼：玻璃幕墙超高层，高约 146 米，三段退台式造型，顶部设观景冠与航空障碍灯。一条空中连廊跨过华山路通往 2 号楼。',
     position: [39, -33], rotation: 0,
+  },
+  {
+    type: 'americaTower2', id: 'america-tower-2',
+    name: '美国大厦 2号楼', nameEn: 'America Tower 2 · Hotel',
+    description: '美国大厦 2 号楼是酒店：香槟色玻璃的圆角塔楼，约 112 米，设落客雨棚、顶层空中酒吧与停机坪，40 米高的空中连廊与 1 号楼相连。',
+    position: [113, -33], rotation: 0, skyBridge: 46,
   },
   {
     type: 'americaMuseum', id: 'america-museum',
@@ -90,7 +101,7 @@ export const LANDMARKS = [
     type: 'homeInn', id: 'home-inn',
     name: '如家酒店', nameEn: 'Home Inn',
     description: '简约舒适的经济型连锁酒店，明黄色立面与蓝色招牌，共 6 层 120 间客房。',
-    position: [112, -40], rotation: 0,
+    position: [112.5, 34.2], rotation: PI,
   },
   {
     type: 'fourSeasons', id: 'four-seasons',
@@ -122,6 +133,24 @@ export const LANDMARKS = [
     description: '悬浮的银色球幕影院、环形光带与参数化幕墙，展示航天、人工智能与新能源科技。',
     position: [-385, -48], rotation: 0,
   },
+  {
+    type: 'planetarium', id: 'planetarium',
+    name: '天文馆', nameEn: 'Planetarium',
+    description: '北原岛上的天文馆：流线形的银色主馆前端高高翘起，屋顶托着一颗巨大的球幕影院，右侧通过桁架廊桥连接观星球。夜晚球体会亮起星图。',
+    position: [70, -488], rotation: 0,
+  },
+  {
+    type: 'orientalPearl', id: 'oriental-pearl',
+    name: '东方明珠', nameEn: 'Oriental Pearl Tower',
+    description: '东方明珠岛的地标电视塔：三根擎天立柱托起大小 11 颗粉红色"明珠"，下球体与上球体设观光层，顶部是太空舱与天线桅杆，高约 188 米。夜晚灯光变幻。',
+    position: [511, -403], rotation: 0,
+  },
+  {
+    type: 'fulaiTower', id: 'fulai-tower',
+    name: '福来大厦', nameEn: 'Fulai Tower',
+    description: '香槟金色的八角形超高层，三段逐级扭转退台，顶部是镂空金冠与发光的"福"字灯笼，寓意福气到来。',
+    position: [405, -402], rotation: 0,
+  },
 ];
 
 // Central grid helpers: lot rectangles between road centerlines, inset by the road half-width.
@@ -152,7 +181,6 @@ export const LOTS = {
     lot(block(-75, 0, 0, 65, { r: 4, t: 4 }), PI),
     lot(block(-75, 0, 65, 130, { r: 4 }), 0),
     lot(block(0, 75, 65, 130, { l: 4 }), 0),
-    lot(block(75, 150, 0, 65, { t: 4 }), PI),
     lot(block(-150, -75, 65, 130), 0),
     { position: [112, -98], rotation: PI, size: [58, 50] },
     // 东林岛
@@ -164,18 +192,20 @@ export const LOTS = {
     { position: [-390, 52], rotation: PI, size: [56, 56] },
     // 南湾岛
     { position: [-38, 416], rotation: 0, size: [50, 50] },
+    // 东方明珠岛
+    { position: [508, -312], rotation: PI, size: [60, 50] },
   ],
   small: [
     { position: [24, 18], rotation: PI, size: [16, 12] },
     { position: [54, 18], rotation: PI, size: [16, 12] },
     { position: [24, 51], rotation: 0, size: [16, 12] },
     { position: [54, 51], rotation: 0, size: [16, 12] },
-    { position: [92, -18], rotation: 0, size: [16, 12] },
     { position: [475, 18], rotation: PI, size: [16, 12] },
     { position: [475, -18], rotation: 0, size: [16, 12] },
     { position: [20, -455], rotation: 0, size: [16, 12] },
     { position: [-404, 18], rotation: PI, size: [16, 12] },
     { position: [20, 418], rotation: -PI / 2, size: [16, 12] },
+    { position: [430, -332], rotation: 0, size: [16, 12] },
   ],
 };
 
@@ -188,5 +218,6 @@ export const ANIMALS = [
   { type: 'rabbit', count: 2, island: 'south' },
   { type: 'duck', count: 4, near: 'south' },
   { type: 'duck', count: 4, near: 'central' },
+  { type: 'rabbit', count: 2, island: 'pearl' },
   { type: 'gull', count: 10 },
 ];
