@@ -34,10 +34,10 @@ float swell(vec2 p, float t, out vec2 slope) {
 vec3 stormWaves(vec2 p, float t, out vec2 slope) {
   vec3 o = vec3(0.0); slope = vec2(0.0);
   vec2 d[4]; float L[4]; float A[4];
-  d[0] = normalize(vec2(1.0, 0.25)); L[0] = 74.0; A[0] = 1.5;
-  d[1] = normalize(vec2(0.85, -0.5)); L[1] = 47.0; A[1] = 0.85;
-  d[2] = normalize(vec2(0.7, 0.7)); L[2] = 29.0; A[2] = 0.45;
-  d[3] = normalize(vec2(1.0, -0.1)); L[3] = 17.0; A[3] = 0.22;
+  d[0] = normalize(vec2(1.0, 0.25)); L[0] = 92.0; A[0] = 2.3;
+  d[1] = normalize(vec2(0.85, -0.5)); L[1] = 56.0; A[1] = 1.3;
+  d[2] = normalize(vec2(0.7, 0.7)); L[2] = 33.0; A[2] = 0.7;
+  d[3] = normalize(vec2(1.0, -0.1)); L[3] = 19.0; A[3] = 0.34;
   for (int i = 0; i < 4; i++) {
     float k = 6.28318 / L[i];
     float w = sqrt(9.8 * k);
@@ -296,7 +296,7 @@ void main() {
   col += aces(uSunColor * spec * uSpecular * sunUp * (1.0 - uRain * 0.85));
 
   // --- Shore foam ---
-  float foamBand = smoothstep(0.9 + uStorm * 3.2, 0.05, depth);
+  float foamBand = smoothstep(0.9 + uStorm * 4.5, 0.05, depth);
   float waveLines = sin(depth * (9.0 - uStorm * 6.0) - uTime * (2.2 + uStorm * 1.8) + vnoise(vWorldPos.xz * 0.4) * 4.0) * 0.5 + 0.5;
   float foamNoise = vnoise(vWorldPos.xz * 1.3 + uTime * 0.3) * vnoise(vWorldPos.xz * 0.5 - uTime * 0.2);
   float foam = foamBand * smoothstep(0.35, 0.85, waveLines * 0.6 + foamNoise * 0.9);
@@ -307,10 +307,10 @@ void main() {
   foam = max(foam, crest * (0.35 + uRain * 0.4) * vnoise(vWorldPos.xz * 0.8 + uTime * 0.5));
   if (uStorm > 0.001) {
     // Breaking crests and wind-blown foam streaks.
-    float breakers = smoothstep(1.0, 2.2, stormH) * vnoise(vWorldPos.xz * 0.35 + uTime * 0.8);
+    float breakers = smoothstep(1.5, 3.2, stormH) * vnoise(vWorldPos.xz * 0.35 + uTime * 0.8);
     vec2 sp = vec2(dot(vBaseXZ, vec2(0.97, 0.24)) * 0.05 - uTime * 0.35, dot(vBaseXZ, vec2(-0.24, 0.97)) * 0.7);
     float streaks = smoothstep(0.62, 0.85, vnoise(sp) * 0.7 + vnoise(sp * 2.3 + 4.1) * 0.4);
-    foam = max(foam, uStorm * smoothstep(3.0, 8.0, depth) * (breakers * 1.3 + streaks * 0.45));
+    foam = max(foam, uStorm * smoothstep(3.0, 8.0, depth) * (breakers * 1.4 + streaks * 0.6));
   }
   col = mix(col, aces(lightCol * 1.05), clamp(foam, 0.0, 1.0) * 0.85);
 
@@ -454,7 +454,7 @@ export class Water {
     this.uniforms.uExposure.value = this.ctx.renderer.toneMappingExposure;
     const rain = this.ctx.uniforms.uRain.value;
     this.uniforms.uSwell.value = 1 + rain * 0.9;
-    this.uniforms.uWind.value = 1 + rain * 0.35 + this.ctx.uniforms.uStorm.value * 0.9;
+    this.uniforms.uWind.value = 1 + rain * 0.35 + this.ctx.uniforms.uStorm.value * 1.3;
   }
 
   /** Render reflection and refraction textures. Call before the main render. */

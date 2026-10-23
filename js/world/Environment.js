@@ -18,10 +18,10 @@ void main() {
   vec3 p = position;
   float speed = 22.0 + fract(p.x * 13.17) * 6.0 + uStorm * 10.0;
   p.y = mod(p.y - uTime * speed, uHeight);
-  p.x = mod(p.x - uCenter.x + uTime * (1.5 + uStorm * 24.0), uBox) - uBox * 0.5 + uCenter.x;
+  p.x = mod(p.x - uCenter.x + uTime * (1.5 + uStorm * 34.0), uBox) - uBox * 0.5 + uCenter.x;
   p.z = mod(p.z - uCenter.z, uBox) - uBox * 0.5 + uCenter.z;
   p.y += uCenter.y - uHeight * 0.45;
-  p += aEnd * vec3(0.04 + uStorm * 0.75, 0.55 + uStorm * 0.25, uStorm * 0.12);
+  p += aEnd * vec3(0.04 + uStorm * 1.05, 0.55 + uStorm * 0.25, uStorm * 0.12);
   float visible = step(fract(position.z * 7.31), uRain);
   vAlpha = visible * (0.25 + 0.3 * aEnd);
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
