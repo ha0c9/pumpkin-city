@@ -1,7 +1,7 @@
 // Cars that drive on the right along the road graph (bridges included), turn on curves through junctions,
 // stop for red lights (shared phase with the signals) and keep a safe gap to the car ahead.
 import { ROAD_STYLE } from '../config/city.layout.js';
-import { mergeColored, mulberry32 } from '../core/Utils.js';
+import { mergeColored, mulberry32, mergeSimple, makeCanvas, canvasTexture } from '../core/Utils.js';
 import { signalState } from './StreetFurniture.js';
 
 const THREE = window.THREE;
@@ -10,8 +10,53 @@ const CAR_TYPES = {
   sedan: { name: '轿车', nameEn: 'Sedan', length: 4.5, colors: [0xd8d8d8, 0x1d1f24, 0xb8202a, 0x2a4f8f, 0xf1f1ee, 0x6b6f75, 0x8a1c2b], weight: 5 },
   suv: { name: '越野车', nameEn: 'SUV', length: 4.8, colors: [0xf1f1ee, 0x2b2e33, 0x3e5f3a, 0x8a8f96, 0x1f3e66], weight: 3 },
   taxi: { name: '出租车', nameEn: 'Taxi', length: 4.5, colors: [0xf2c21b], weight: 2 },
-  bus: { name: '公交车', nameEn: 'City Bus', length: 11, colors: [0x2f8f4a, 0xe8731a], weight: 1 },
+  bus: { name: '公交车', nameEn: 'City Bus', length: 11, colors: [0x2f8f4a], weight: 0 },
 };
+
+/** Bus routes: every route always has at least one bus on the road. */
+export const BUS_ROUTES = [
+  { no: '113', color: 0x2f9a52, from: '南瓜中心岛', to: '北原岛' },
+  { no: '138', color: 0x2c6fc0, from: '东林岛', to: '东方明珠岛' },
+  { no: '328', color: 0xe8731a, from: '西岭岛', to: '南湾岛' },
+  { no: '71', color: 0xc7302b, from: '中运量', to: '南瓜大道' },
+];
+
+/** LED route board: amber number + destination on black. */
+function routeTexture(route) {
+  const c = makeCanvas(512, 128);
+  const x = c.getContext('2d');
+  x.fillStyle = '#0b0b0d'; x.fillRect(0, 0, 512, 128);
+  x.fillStyle = '#ffb21a'; x.textBaseline = 'middle';
+  x.shadowColor = '#ff8a00'; x.shadowBlur = 10;
+  x.font = 'bold 92px "Helvetica Neue",Arial,sans-serif';
+  x.textAlign = 'left';
+  x.fillText(route.no, 16, 66);
+  const w = x.measureText(route.no).width;
+  x.font = 'bold 40px "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif';
+  x.fillText('路', 22 + w, 82);
+  x.textAlign = 'center';
+  const cx = (70 + w + 512) / 2;
+  x.font = 'bold 36px "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif';
+  x.fillText(route.from, cx, 40);
+  x.fillText('⇄ ' + route.to, cx, 90);
+  return canvasTexture(c, { anisotropy: 8 });
+}
+
+/** Route boards on a bus: above the windscreen, on the rear and on both sides (local +Z is forward). */
+function routeSignGeometry() {
+  const geos = [];
+  const quad = (w, h, x, y, z, ry) => {
+    const g = new THREE.PlaneGeometry(w, h);
+    g.rotateY(ry);
+    g.translate(x, y, z);
+    geos.push(g);
+  };
+  quad(2.0, 0.42, 0, 2.8, 5.54, 0);
+  quad(1.2, 0.3, 0, 2.86, -5.54, Math.PI);
+  quad(2.2, 0.4, 1.27, 2.86, 3.2, Math.PI / 2);
+  quad(2.2, 0.4, -1.27, 2.86, 3.2, -Math.PI / 2);
+  return mergeSimple(geos);
+}
 
 /** Vehicle bodies built from boxes; the instance color tints the white body parts. Forward is local +Z. */
 function carGeometry(type) {
@@ -112,10 +157,11 @@ export class Traffic {
     for (const b of bridges.items) {
       const NA = near(b.A.x, b.A.y), NB = near(b.B.x, b.B.y);
       if (!NA || !NB) continue;
-      const D = new THREE.Vector3(b.D.x, 0, b.D.y);
+      const DA = new THREE.Vector3(b.D.x, 0, b.D.y), DB = new THREE.Vector3(b.DB.x, 0, b.DB.y);
       for (const [P, Q, fwd] of [[NA, NB, true], [NB, NA, false]]) {
-        const d = fwd ? D.clone() : D.clone().negate();
-        const e = { from: P, to: Q, dir: d, endDir: d, axis: null, lanes: b.lanes, len: b.L, bridge: b, fwd };
+        const d = fwd ? DA.clone() : DB.clone().negate();
+        const endDir = fwd ? DB.clone() : DA.clone().negate();
+        const e = { from: P, to: Q, dir: d, endDir, axis: null, lanes: b.lanes, len: b.L, bridge: b, fwd };
         edges.push(e);
         out.get(P).push(e);
       }
@@ -151,7 +197,8 @@ export class Traffic {
       return types[0];
     };
     const plan = [];
-    for (let i = 0; i < count; i++) plan.push(pickType());
+    const buses = count >= 40 ? BUS_ROUTES.length * 2 : BUS_ROUTES.length;
+    for (let i = 0; i < count; i++) plan.push(i < buses ? 'bus' : pickType());
     const bodyMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.55, envMapIntensity: 1.2 });
     this.ctx.wetMaterials.push({ material: bodyMat, dry: 0.35, wet: 0.15 });
     const headMat = new THREE.MeshStandardMaterial({ color: 0xfff6dd, emissive: 0xfff0c8, emissiveIntensity: 0.1 });
@@ -159,6 +206,19 @@ export class Traffic {
     this.ctx.nightMaterials.push({ material: headMat, intensity: 2.2, base: 0.1 });
     this.ctx.nightMaterials.push({ material: tailMat, intensity: 1.6, base: 0.15 });
     this.meshes = {};
+    const busTotal = plan.filter((t) => t === 'bus').length;
+    const signs = BUS_ROUTES.map((route, k) => {
+      const map = routeTexture(route);
+      const mat = new THREE.MeshStandardMaterial({ map, emissive: 0xffffff, emissiveMap: map, emissiveIntensity: 0.35, roughness: 0.5 });
+      this.ctx.nightMaterials.push({ material: mat, intensity: 1.4, base: 0.35 });
+      const n = Math.ceil((busTotal - k) / BUS_ROUTES.length);
+      const mesh = new THREE.InstancedMesh(this._signGeo || (this._signGeo = routeSignGeometry()), mat, Math.max(1, n));
+      mesh.count = Math.max(0, n);
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      mesh.frustumCulled = false;
+      this.group.add(mesh);
+      return { mesh, used: 0 };
+    });
     const roadEdges = this.edges.filter((e) => !e.bridge && e.len > 12);
     for (const type of types) {
       const n = plan.filter((t) => t === type).length;
@@ -172,13 +232,22 @@ export class Traffic {
       const infos = [];
       const color = new THREE.Color();
       for (let i = 0; i < n; i++) {
-        color.set(def.colors[Math.floor(this.rng() * def.colors.length)]);
+        const route = type === 'bus' ? BUS_ROUTES[i % BUS_ROUTES.length] : null;
+        if (route) color.set(route.color).convertSRGBToLinear();
+        else color.set(def.colors[Math.floor(this.rng() * def.colors.length)]);
         body.setColorAt(i, color);
         const car = this._spawn(type, def, roadEdges);
         car.mesh = body; car.head = head; car.tail = tail; car.index = i;
-        infos.push({
+        if (route) {
+          const sign = signs[i % BUS_ROUTES.length];
+          car.sign = sign.mesh; car.signIndex = sign.used++;
+        }
+        infos.push(route ? {
+          id: `bus-${route.no}-${i}`, name: `${route.no}路公交车`, nameEn: `Bus Route ${route.no}`, category: '交通 Traffic',
+          description: `${route.no}路：${route.from} ⇄ ${route.to}。车头、车尾和车身两侧的 LED 路牌显示线路号，经桥梁往返各岛。`,
+        } : {
           id: `car-${type}-${i}`, name: def.name, nameEn: def.nameEn, category: '交通 Traffic',
-          description: type === 'bus' ? '南瓜岛公交，沿城市道路行驶，经桥梁往返各岛。' : '行驶在南瓜岛道路上的车辆，遵守红绿灯并保持车距。',
+          description: '行驶在南瓜岛道路上的车辆，遵守红绿灯并保持车距。',
         });
       }
       body.instanceColor.needsUpdate = true;
@@ -324,5 +393,6 @@ export class Traffic {
     car.mesh.setMatrixAt(car.index, m);
     car.head.setMatrixAt(car.index, m);
     car.tail.setMatrixAt(car.index, m);
+    if (car.sign) car.sign.setMatrixAt(car.signIndex, m);
   }
 }

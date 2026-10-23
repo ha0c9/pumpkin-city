@@ -24,7 +24,7 @@ export class IslandField {
       const pad = isl.coast * 1.5 + 10;
       const radius = Math.max(maxX - minX, maxZ - minZ) / 2;
       return {
-        ...isl, height: plateau, radius,
+        ...isl, height: isl.ground ?? plateau, radius,
         landBox: [minX - pad, minZ - pad, maxX + pad, maxZ + pad],
         box: [minX - pad - UNDERWATER_FALLOFF, minZ - pad - UNDERWATER_FALLOFF, maxX + pad + UNDERWATER_FALLOFF, maxZ + pad + UNDERWATER_FALLOFF],
       };
@@ -51,7 +51,8 @@ export class IslandField {
     const b = isl.box;
     if (x < b[0] || x > b[2] || z < b[1] || z > b[3]) return -Infinity;
     const d = this.sdf(isl, x, z);
-    const W = this.shore, H = this.plateau;
+    // Higher islands get a wider (still steeper) shore, so they rise from the sea as low cliffs.
+    const H = isl.height, W = this.shore + Math.max(0, H - this.plateau) * 0.6;
     let h;
     if (d <= -W) h = H;
     else if (d <= 0) {

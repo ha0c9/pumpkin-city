@@ -24,6 +24,8 @@ uniform float uTime;
 uniform vec3 uDayZenith, uDayHorizon, uSunsetHorizon, uNightZenith, uNightHorizon;
 uniform float uSunDisk;
 uniform float uScale;
+uniform vec3 uFogColor;
+uniform float uHorizonFog;
 varying vec3 vDir;
 ${NOISE_GLSL}
 float fbm5(vec2 p) {
@@ -88,6 +90,9 @@ void main() {
 
   gl_FragColor = vec4(col * uScale, 1.0);
   #include <tonemapping_fragment>
+  // Fully fogged water ends at the camera far plane; below the horizon the sky takes the
+  // fog color too, so that edge never shows as a line.
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, uFogColor, uHorizonFog * (1.0 - smoothstep(-0.02, 0.07, y)));
   #include <encodings_fragment>
 }
 `;
@@ -104,6 +109,7 @@ export class Sky {
       uSunsetHorizon: { value: v3(SKY.sunsetHorizon) },
       uNightZenith: { value: v3(SKY.nightZenith) }, uNightHorizon: { value: v3(SKY.nightHorizon) },
       uSunDisk: { value: 1 }, uScale: { value: 1 },
+      uFogColor: { value: new THREE.Color(1, 1, 1) }, uHorizonFog: { value: 1 },
     };
     this.material = new THREE.ShaderMaterial({
       vertexShader: SKY_VS, fragmentShader: SKY_FS, uniforms: this.uniforms,
@@ -119,7 +125,7 @@ export class Sky {
     // The environment bake skips the sun disk: direct sunlight comes from the shadow-casting light.
     this.envMaterial = new THREE.ShaderMaterial({
       vertexShader: SKY_VS, fragmentShader: SKY_FS,
-      uniforms: { ...this.uniforms, uSunDisk: { value: 0 }, uScale: { value: 0.75 } },
+      uniforms: { ...this.uniforms, uSunDisk: { value: 0 }, uScale: { value: 0.75 }, uHorizonFog: { value: 0 } },
       side: THREE.BackSide, depthWrite: false,
     });
     this.envMesh = new THREE.Mesh(new THREE.SphereGeometry(100, 32, 16), this.envMaterial);

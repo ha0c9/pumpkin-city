@@ -30,39 +30,40 @@ export const ROADS = [
   { id: 'panyu', name: '番禺路', nameEn: 'Panyu Rd', from: [150, -130], to: [150, 65], lanes: 2 },
 
   // --- 东林岛 ---
-  { id: 'donglin', name: '东林大道', nameEn: 'Donglin Ave', from: [362, 0], to: [520, 0], lanes: 4 },
-  { id: 'siji', name: '四季路', nameEn: 'Siji Rd', from: [450, -85], to: [450, 130], lanes: 2 },
-  { id: 'linhai', name: '临海路', nameEn: 'Linhai Rd', from: [365, -60], to: [450, -60], lanes: 2 },
+  { id: 'donglin', name: '东林大道', nameEn: 'Donglin Ave', from: [402, 45], to: [560, 45], lanes: 4 },
+  { id: 'siji', name: '四季路', nameEn: 'Siji Rd', from: [490, -40], to: [490, 175], lanes: 2 },
+  { id: 'linhai', name: '临海路', nameEn: 'Linhai Rd', from: [405, -15], to: [490, -15], lanes: 2 },
 
   // --- 北原岛 ---
-  { id: 'beiyuan', name: '北原路', nameEn: 'Beiyuan Rd', from: [0, -375], to: [0, -530], lanes: 2 },
-  { id: 'wulin', name: '雾林路', nameEn: 'Wulin Rd', from: [-85, -440], to: [95, -440], lanes: 2 },
+  { id: 'beiyuan', name: '北原路', nameEn: 'Beiyuan Rd', from: [-60, -425], to: [-60, -580], lanes: 2 },
+  { id: 'wulin', name: '雾林路', nameEn: 'Wulin Rd', from: [-145, -490], to: [35, -490], lanes: 2 },
 
   // --- 西岭岛 ---
-  { id: 'xiling', name: '西岭路', nameEn: 'Xiling Rd', from: [-360, 0], to: [-480, 0], lanes: 4 },
-  { id: 'keji', name: '科技路', nameEn: 'Keji Rd', from: [-430, -100], to: [-430, 105], lanes: 2 },
+  { id: 'xiling', name: '西岭路', nameEn: 'Xiling Rd', from: [-410, -60], to: [-530, -60], lanes: 4 },
+  { id: 'keji', name: '科技路', nameEn: 'Keji Rd', from: [-480, -136], to: [-480, 45], lanes: 2 },
 
   // --- 南湾岛 ---
-  { id: 'haiyang', name: '海洋路', nameEn: 'Haiyang Rd', from: [0, 368], to: [0, 535], lanes: 2 },
-  { id: 'nanwan', name: '南湾路', nameEn: 'Nanwan Rd', from: [-85, 450], to: [125, 450], lanes: 2 },
+  { id: 'haiyang', name: '海洋路', nameEn: 'Haiyang Rd', from: [80, 408], to: [80, 560], lanes: 2 },
+  { id: 'nanwan', name: '南湾路', nameEn: 'Nanwan Rd', from: [-5, 490], to: [205, 490], lanes: 2 },
 
   // --- 东方明珠岛 ---
-  { id: 'mingzhu', name: '明珠路', nameEn: 'Mingzhu Rd', from: [450, -250], to: [450, -450], lanes: 2 },
-  { id: 'lujiazui', name: '陆家嘴路', nameEn: 'Lujiazui Rd', from: [392, -360], to: [556, -360], lanes: 2 },
+  { id: 'mingzhu', name: '明珠路', nameEn: 'Mingzhu Rd', from: [500, -275], to: [500, -460], lanes: 2 },
+  { id: 'lujiazui', name: '陆家嘴路', nameEn: 'Lujiazui Rd', from: [442, -370], to: [606, -370], lanes: 2 },
 ];
 
 /**
- * Bridges start at a road end and head in `dir` until they reach the `to` island. A connecting road
- * from `from` to the bridge abutment is created automatically, and on the far side the bridge joins
- * the first road found straight ahead (or ends in a short dead-end road).
+ * Bridges join two road ends: `from` + `dir` (heading out of the first island) and `end` + `endDir`
+ * (heading into the `to` island when arriving). The road ends may be offset sideways and sit at
+ * different island heights; the deck curves between them and climbs or descends (js/world/BridgePath.js).
+ * Abutments are found where each road meets the water; short connector roads are added automatically.
  * style: 'arch' | 'cable' | 'beam'
  */
 export const BRIDGES = [
-  { id: 'bridge-east', name: '东林拱桥', nameEn: 'East Grove Arch Bridge', from: [150, 0], dir: [1, 0], to: 'east', lanes: 4, style: 'arch' },
-  { id: 'bridge-north', name: '北原斜拉桥', nameEn: 'North Meadow Cable Bridge', from: [0, -130], dir: [0, -1], to: 'north', lanes: 2, style: 'cable' },
-  { id: 'bridge-west', name: '西岭大桥', nameEn: 'West Ridge Bridge', from: [-150, 0], dir: [-1, 0], to: 'west', lanes: 4, style: 'beam' },
-  { id: 'bridge-south', name: '南湾拱桥', nameEn: 'South Cove Arch Bridge', from: [0, 130], dir: [0, 1], to: 'south', lanes: 2, style: 'arch' },
-  { id: 'bridge-pearl', name: '明珠大桥', nameEn: 'Pearl Cable Bridge', from: [450, -85], dir: [0, -1], to: 'pearl', lanes: 2, style: 'cable' },
+  { id: 'bridge-east', name: '东林拱桥', nameEn: 'East Grove Arch Bridge', from: [150, 0], dir: [1, 0], to: 'east', end: [402, 45], endDir: [1, 0], lanes: 4, style: 'arch' },
+  { id: 'bridge-north', name: '北原斜拉桥', nameEn: 'North Meadow Cable Bridge', from: [0, -130], dir: [0, -1], to: 'north', end: [-60, -425], endDir: [0, -1], lanes: 2, style: 'cable' },
+  { id: 'bridge-west', name: '西岭大桥', nameEn: 'West Ridge Bridge', from: [-150, 0], dir: [-1, 0], to: 'west', end: [-410, -60], endDir: [-1, 0], lanes: 4, style: 'beam' },
+  { id: 'bridge-south', name: '南湾拱桥', nameEn: 'South Cove Arch Bridge', from: [0, 130], dir: [0, 1], to: 'south', end: [80, 408], endDir: [0, 1], lanes: 2, style: 'arch' },
+  { id: 'bridge-pearl', name: '明珠大桥', nameEn: 'Pearl Cable Bridge', from: [490, -40], dir: [0, -1], to: 'pearl', end: [500, -275], endDir: [0, -1], lanes: 2, style: 'cable' },
 ];
 
 /** Landmark buildings with fixed positions. `type` must be registered in js/buildings/index.js. */
@@ -107,49 +108,49 @@ export const LANDMARKS = [
     type: 'fourSeasons', id: 'four-seasons',
     name: '四季酒店', nameEn: 'Four Seasons Hotel',
     description: '东林岛上的豪华度假酒店：双塔客房楼、空中连廊、无边泳池，园区内设有摩天轮、旋转木马和过山车的游乐场。',
-    position: [406, 66], rotation: 0,
+    position: [446, 111], rotation: 0,
   },
   {
     type: 'ghostMuseum', id: 'ghost-museum',
     name: '幽灵博物馆', nameEn: 'Ghost Museum',
     description: '扭转的暗色塔身、悬浮的碎片与幽幽发光的裂缝，夜晚有幽灵在建筑周围游荡。展出世界各地的鬼怪传说。',
-    position: [-44, -400], rotation: PI,
+    position: [-104, -450], rotation: PI,
   },
   {
     type: 'oceanMuseum', id: 'ocean-museum',
     name: '海洋博物馆', nameEn: 'Ocean Museum',
     description: '一艘停靠在海边的巨轮造型建筑，船身内展出珊瑚礁、鲸类骨架与深海生物，甲板是观景平台。',
-    position: [110, 492], rotation: 0,
+    position: [190, 532], rotation: 0,
   },
   {
     type: 'oceanGallery', id: 'ocean-gallery',
     name: '海洋美术馆', nameEn: 'Ocean Art Gallery',
     description: '像浪花与贝壳一样层层展开的白色曲面屋顶，展出以海洋为主题的绘画与雕塑。',
-    position: [40, 498], rotation: 0,
+    position: [120, 538], rotation: 0,
   },
   {
     type: 'scienceMuseum', id: 'science-museum',
     name: '科技馆', nameEn: 'Science & Technology Museum',
     description: '悬浮的银色球幕影院、环形光带与参数化幕墙，展示航天、人工智能与新能源科技。',
-    position: [-385, -48], rotation: 0,
+    position: [-435, -108], rotation: 0,
   },
   {
     type: 'planetarium', id: 'planetarium',
     name: '天文馆', nameEn: 'Planetarium',
     description: '北原岛上的天文馆：流线形的银色主馆前端高高翘起，屋顶托着一颗巨大的球幕影院，右侧通过桁架廊桥连接观星球。夜晚球体会亮起星图。',
-    position: [70, -488], rotation: 0,
+    position: [10, -538], rotation: 0,
   },
   {
     type: 'orientalPearl', id: 'oriental-pearl',
     name: '东方明珠', nameEn: 'Oriental Pearl Tower',
     description: '东方明珠岛的地标电视塔：三根擎天立柱托起大小 11 颗粉红色"明珠"，下球体与上球体设观光层，顶部是太空舱与天线桅杆，高约 188 米。夜晚灯光变幻。',
-    position: [511, -403], rotation: 0,
+    position: [561, -413], rotation: 0,
   },
   {
     type: 'fulaiTower', id: 'fulai-tower',
     name: '福来大厦', nameEn: 'Fulai Tower',
     description: '香槟金色的八角形超高层，三段逐级扭转退台，顶部是镂空金冠与发光的"福"字灯笼，寓意福气到来。',
-    position: [405, -402], rotation: 0,
+    position: [455, -412], rotation: 0,
   },
 ];
 
@@ -184,28 +185,28 @@ export const LOTS = {
     lot(block(-150, -75, 65, 130), 0),
     { position: [112, -98], rotation: PI, size: [58, 50] },
     // 东林岛
-    { position: [408, -32], rotation: 0, size: [66, 38] },
+    { position: [448, 13], rotation: 0, size: [66, 38] },
     // 北原岛
-    { position: [50, -402], rotation: PI, size: [74, 60] },
-    { position: [-42, -482], rotation: 0, size: [60, 64] },
+    { position: [-10, -452], rotation: PI, size: [74, 60] },
+    { position: [-102, -532], rotation: 0, size: [60, 64] },
     // 西岭岛
-    { position: [-390, 52], rotation: PI, size: [56, 56] },
+    { position: [-440, -8], rotation: PI, size: [56, 56] },
     // 南湾岛
-    { position: [-38, 416], rotation: 0, size: [50, 50] },
+    { position: [42, 456], rotation: 0, size: [50, 50] },
     // 东方明珠岛
-    { position: [508, -312], rotation: PI, size: [60, 50] },
+    { position: [558, -322], rotation: PI, size: [60, 50] },
   ],
   small: [
     { position: [24, 18], rotation: PI, size: [16, 12] },
     { position: [54, 18], rotation: PI, size: [16, 12] },
     { position: [24, 51], rotation: 0, size: [16, 12] },
     { position: [54, 51], rotation: 0, size: [16, 12] },
-    { position: [475, 18], rotation: PI, size: [16, 12] },
-    { position: [475, -18], rotation: 0, size: [16, 12] },
-    { position: [20, -455], rotation: 0, size: [16, 12] },
-    { position: [-404, 18], rotation: PI, size: [16, 12] },
-    { position: [20, 418], rotation: -PI / 2, size: [16, 12] },
-    { position: [430, -332], rotation: 0, size: [16, 12] },
+    { position: [515, 63], rotation: PI, size: [16, 12] },
+    { position: [515, 27], rotation: 0, size: [16, 12] },
+    { position: [-40, -505], rotation: 0, size: [16, 12] },
+    { position: [-454, -42], rotation: PI, size: [16, 12] },
+    { position: [100, 458], rotation: -PI / 2, size: [16, 12] },
+    { position: [480, -342], rotation: 0, size: [16, 12] },
   ],
 };
 
@@ -220,4 +221,16 @@ export const ANIMALS = [
   { type: 'duck', count: 4, near: 'central' },
   { type: 'rabbit', count: 2, island: 'pearl' },
   { type: 'gull', count: 10 },
+  { type: 'squirrel', count: 4, island: 'east' },
+  { type: 'squirrel', count: 3, island: 'north' },
+  { type: 'peacock', count: 2, island: 'pearl' },
+  { type: 'peacock', count: 2, island: 'west' },
+  { type: 'crab', count: 6, near: 'south' },
+  { type: 'crab', count: 4, near: 'east' },
+  { type: 'turtle', count: 3, near: 'south' },
+  { type: 'turtle', count: 2, near: 'west' },
+  { type: 'swan', count: 3, near: 'north' },
+  { type: 'dolphin', count: 3, near: 'south' },
+  { type: 'dolphin', count: 3, near: 'west' },
+  { type: 'dolphin', count: 3, near: 'pearl' },
 ];

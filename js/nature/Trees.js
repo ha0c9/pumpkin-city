@@ -232,11 +232,12 @@ function makeMaterial(ctx, atlas, swayAmount) {
           vec2 ip = vec2(0.0);
         #endif
         float hgt = max(position.y - 1.0, 0.0);
-        float wind = (1.0 + uRain * 1.5 + uStorm * 5.0) * ${swayAmount.toFixed(4)};
+        float wind = (1.0 + uRain * 1.5 + uStorm * 7.5) * ${swayAmount.toFixed(4)};
         float sway = sin(uTime * 1.1 + ip.x * 0.13 + ip.y * 0.11) * 0.6 + sin(uTime * 2.3 + ip.x * 0.3) * 0.25;
         transformed.x += sway * hgt * hgt * wind;
         transformed.z += sway * hgt * hgt * wind * 0.5;
-        transformed.x += hgt * hgt * uStorm * ${(swayAmount * 4).toFixed(4)};
+        float gust = sin(uTime * 3.7 + ip.x * 0.05 - ip.y * 0.03) * 0.5 + 0.5;
+        transformed.x += hgt * hgt * uStorm * (1.0 + gust * 0.8) * ${(swayAmount * 6).toFixed(4)};
         transformed += normal * sin(uTime * 6.0 + position.x * 3.0 + position.z * 2.0) * 0.03 * step(1.5, position.y) * (1.0 + uRain);`);
     // Keep the spherical crown normals on both faces of each card.
     shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>',

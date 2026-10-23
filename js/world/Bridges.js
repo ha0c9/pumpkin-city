@@ -1,7 +1,8 @@
-// Bridges between islands. Placement is found by marching across the terrain from a city road end.
+// Bridges between islands: curved, sloped decks between two road ends (see BridgePath.js).
 import { BRIDGES, ROADS, ROAD_STYLE } from '../config/city.layout.js';
 import { roadTexture, paverTexture, concreteTexture } from '../core/Textures.js';
-import { rodMatrix, instancedFrom, clamp } from '../core/Utils.js';
+import { rodMatrix, instancedFrom } from '../core/Utils.js';
+import { BridgePath } from './BridgePath.js';
 
 const THREE = window.THREE;
 
@@ -9,58 +10,42 @@ export class Bridge {
   constructor(cfg, terrain) {
     this.cfg = cfg;
     this.id = cfg.id;
-    this.D = new THREE.Vector2(cfg.dir[0], cfg.dir[1]).normalize();
-    this.R = new THREE.Vector2(-this.D.y, this.D.x);
-    const F = new THREE.Vector2(cfg.from[0], cfg.from[1]);
-    const startIsland = terrain.islandAt(F.x, F.y);
-    const target = terrain.islandById(cfg.to);
-    const hStart = terrain.heightAt(F.x, F.y);
-    // Abutment A: last plateau point before the water (small dips on the way are ignored).
-    let tA = 0, lastFlat = 0;
-    for (let t = 0; t < 600; t += 0.5) {
-      const h = terrain.heightAt(F.x + this.D.x * t, F.y + this.D.y * t);
-      if (h >= hStart - 0.03) lastFlat = t;
-      if (h < 0) { tA = Math.max(0, lastFlat - 1.5); break; }
-    }
-    let tB = tA + 10;
-    for (let t = tA + 5; t < 800; t += 0.5) {
-      const x = F.x + this.D.x * t, z = F.y + this.D.y * t;
-      const isl = terrain.islandAt(x, z);
-      if (isl && isl.id === target.id && terrain.heightAt(x, z) >= target.height - 0.03) { tB = t + 1.5; break; }
-    }
-    this.start = F.clone();
-    this.A = F.clone().addScaledVector(this.D, tA);
-    this.B = F.clone().addScaledVector(this.D, tB);
-    this.L = tB - tA;
-    this.hA = terrain.heightAt(this.A.x, this.A.y);
-    this.hB = terrain.heightAt(this.B.x, this.B.y);
+    this.path = new BridgePath(cfg, terrain.field);
+    const P = this.path;
+    this.start = new THREE.Vector2(...P.start);
+    this.end = new THREE.Vector2(...P.end);
+    this.A = new THREE.Vector2(...P.A);
+    this.B = new THREE.Vector2(...P.B);
+    this.D = new THREE.Vector2(...P.dA);
+    this.DB = new THREE.Vector2(...P.dB);
+    this.L = P.length;
+    this.hA = P.hA;
+    this.hB = P.hB;
     this.lanes = cfg.lanes || 2;
     this.carriage = this.lanes * ROAD_STYLE.laneWidth;
     this.walk = ROAD_STYLE.sidewalk;
     this.width = this.carriage + this.walk * 2;
-    this.rise = { arch: 2.6, cable: 4.5, beam: 3.4 }[cfg.style] || 3;
-    this.fromIsland = startIsland;
-    this.toIsland = target;
+    this.rise = P.rise;
+    this.fromIsland = terrain.islandAt(cfg.from[0], cfg.from[1]);
+    this.toIsland = terrain.islandById(cfg.to);
   }
 
-  deckY(s) {
-    const k = Math.sin(Math.PI * clamp(s, 0, 1));
-    return this.hA + (this.hB - this.hA) * s + this.rise * k * k;
-  }
+  deckY(s) { return this.path.deckY(s); }
 
+  /** Heading (rotation around Y) of the deck at s, for objects whose local +Z runs along the deck. */
+  heading(s) { const c = this.path.at(s); return Math.atan2(c.tx, c.tz); }
+
+  /** Point at arc-length fraction s, r meters to the right of the centerline, yOff above the deck. */
   point(s, r, yOff = 0, out = new THREE.Vector3()) {
-    const x = this.A.x + this.D.x * this.L * s + this.R.x * r;
-    const z = this.A.y + this.D.y * this.L * s + this.R.y * r;
-    return out.set(x, this.deckY(s) + yOff, z);
+    const c = this.path.at(s);
+    return out.set(c.x - c.tz * r, this.deckY(s) + yOff, c.z + c.tx * r);
   }
 
   /** Deck height at (x, z) or null when outside the deck. */
   heightAt(x, z) {
-    const dx = x - this.A.x, dz = z - this.A.y;
-    const along = dx * this.D.x + dz * this.D.y;
-    const across = dx * this.R.x + dz * this.R.y;
-    if (along < 0 || along > this.L || Math.abs(across) > this.width / 2) return null;
-    return this.deckY(along / this.L) + (Math.abs(across) > this.carriage / 2 ? 0.2 : 0.03);
+    const pr = this.path.project(x, z, this.width);
+    if (!pr || Math.abs(pr.across) > this.width / 2) return null;
+    return this.deckY(pr.s) + (Math.abs(pr.across) > this.carriage / 2 ? 0.2 : 0.03);
   }
 }
 
@@ -98,6 +83,12 @@ function sweep(bridge, profile, { segments, uvMode = 'world', unit = 1, s0 = 0, 
   return g;
 }
 
+function bridgeSlope(b) {
+  const dh = b.hB - b.hA;
+  if (Math.abs(dh) < 1) return '桥面平缓弯曲。';
+  return `桥面弯曲，${dh > 0 ? '上坡' : '下坡'}约 ${Math.abs(dh).toFixed(0)} 米驶向${b.toIsland.name}。`;
+}
+
 export class Bridges {
   constructor(ctx, terrain) {
     this.ctx = ctx;
@@ -120,29 +111,19 @@ export class Bridges {
     for (const b of this.items) this._build(b, terrain);
   }
 
-  /** Extra road segments that connect the city grid and far islands to the bridge decks. */
+  /** Extra road segments that join each deck to the road ends it connects. */
   connectorRoads() {
     const roads = [];
     const same = (p, x, z) => Math.abs(p[0] - x) < 0.5 && Math.abs(p[1] - z) < 0.5;
+    const named = (pt) => ROADS.find((r) => same(r.from, pt.x, pt.y) || same(r.to, pt.x, pt.y));
     for (const b of this.items) {
-      if (b.A.distanceTo(b.start) > 0.5) {
-        const src = ROADS.find((r) => same(r.from, b.start.x, b.start.y) || same(r.to, b.start.x, b.start.y));
-        roads.push({ id: `${b.id}-approach`, name: src ? src.name : b.cfg.name, nameEn: src ? src.nameEn : b.cfg.nameEn,
-          from: [b.start.x, b.start.y], to: [b.A.x, b.A.y], lanes: b.lanes, endA: 'node', endB: 'bridge', connector: true });
+      for (const [id, roadEnd, abut, endA, endB] of [['approach', b.start, b.A, 'node', 'bridge'], ['landing', b.end, b.B, 'bridge', 'node']]) {
+        if (abut.distanceTo(roadEnd) < 0.5) continue;
+        const src = named(roadEnd);
+        const [from, to] = endA === 'node' ? [roadEnd, abut] : [abut, roadEnd];
+        roads.push({ id: `${b.id}-${id}`, name: src ? src.name : b.cfg.name, nameEn: src ? src.nameEn : b.cfg.nameEn,
+          from: [from.x, from.y], to: [to.x, to.y], lanes: b.lanes, endA, endB, connector: true });
       }
-      // Join the first collinear road straight ahead on the far island, else end in a short stub.
-      let joinT = Infinity, joinRoad = null;
-      for (const r of ROADS) {
-        for (const p of [r.from, r.to]) {
-          const dx = p[0] - b.B.x, dz = p[1] - b.B.y;
-          const along = dx * b.D.x + dz * b.D.y, across = Math.abs(dx * b.R.x + dz * b.R.y);
-          if (across < 0.5 && along > -0.5 && along < 120 && along < joinT) { joinT = along; joinRoad = r; }
-        }
-      }
-      const end = b.B.clone().addScaledVector(b.D, joinRoad ? Math.max(joinT, 0.5) : 18);
-      roads.push({ id: `${b.id}-landing`, name: joinRoad ? joinRoad.name : b.toIsland.name + '入口',
-        nameEn: joinRoad ? joinRoad.nameEn : b.toIsland.nameEn + ' Entrance',
-        from: [b.B.x, b.B.y], to: [end.x, end.y], lanes: b.lanes, endA: 'bridge', endB: joinRoad ? 'node' : 'deadend', connector: true });
     }
     return roads;
   }
@@ -204,7 +185,8 @@ export class Bridges {
       const s = i / lampN;
       const side = i % 2 === 0 ? 1 : -1;
       const p = b.point(s, side * (hw - 0.45), 0.2);
-      this.lamps.push({ x: p.x, y: p.y, z: p.z, dirX: -side * b.R.x, dirZ: -side * b.R.y });
+      const c = b.path.at(s);
+      this.lamps.push({ x: p.x, y: p.y, z: p.z, dirX: side * c.tz, dirZ: -side * c.tx });
     }
 
     // Structural style.
@@ -222,7 +204,7 @@ export class Bridges {
       const cap = new THREE.Mesh(this.unitBox, this.mats.concrete);
       cap.position.addVectors(capA, capB).multiplyScalar(0.5);
       cap.scale.set(b.width - 1, 1, 2.2);
-      cap.rotation.y = Math.atan2(b.D.x, b.D.y);
+      cap.rotation.y = b.heading(s);
       cap.castShadow = true;
       g.add(cap);
     };
@@ -259,7 +241,11 @@ export class Bridges {
         rods.steel.push(rodMatrix(curves[0].getPointAt(t), curves[1].getPointAt(t), 0.22));
       }
       for (const side of [-1, 1]) {
-        rods.steel.push(rodMatrix(b.point(0.04, side * (hw + 0.35), -thick), b.point(0.96, side * (hw + 0.35), -thick), 0.3));
+        const ties = Math.ceil(b.L / 6);
+        for (let i = 0; i < ties; i++) {
+          const s0 = 0.04 + 0.92 * i / ties, s1 = 0.04 + 0.92 * (i + 1) / ties;
+          rods.steel.push(rodMatrix(b.point(s0, side * (hw + 0.35), -thick), b.point(s1, side * (hw + 0.35), -thick), 0.3));
+        }
       }
     } else if (b.cfg.style === 'cable') {
       const sP = 0.5;
@@ -303,7 +289,7 @@ export class Bridges {
       const ab = new THREE.Mesh(this.unitBox, this.mats.concrete);
       ab.scale.set(b.width + 0.6, 6, 3);
       ab.position.set(p.x, p.y - thick - 2.6, p.z);
-      ab.rotation.y = Math.atan2(b.D.x, b.D.y);
+      ab.rotation.y = b.heading(s);
       g.add(ab);
     }
 
@@ -313,15 +299,18 @@ export class Bridges {
 
     const info = {
       id: b.id, name: b.cfg.name, nameEn: b.cfg.nameEn, category: '桥梁 Bridge',
-      description: `连接${b.fromIsland ? b.fromIsland.name : ''}与${b.toIsland.name}，全长约 ${Math.round(b.L)} 米，${b.lanes} 车道，双侧人行道。`,
+      description: `连接${b.fromIsland ? b.fromIsland.name : ''}与${b.toIsland.name}，全长约 ${Math.round(b.L)} 米，${b.lanes} 车道，双侧人行道。${bridgeSlope(b)}`,
     };
     g.traverse((o) => { o.userData.pick = info; });
     const mid = b.point(0.5, 0, 0);
     info.focus = [mid.x, mid.y, mid.z];
     info.radius = b.L * 0.6;
     this.ctx.pickables.push(g);
-    this.ctx.mask.addRect((b.A.x + b.B.x) / 2, (b.A.y + b.B.y) / 2,
-      Math.abs(b.D.x) > 0.5 ? b.L + 4 : b.width + 2, Math.abs(b.D.x) > 0.5 ? b.width + 2 : b.L + 4, 0, 'bridge');
+    const pieces = Math.ceil(b.L / 6);
+    for (let i = 0; i < pieces; i++) {
+      const c = b.path.at((i + 0.5) / pieces);
+      this.ctx.mask.addRect(c.x, c.z, b.L / pieces + 2, b.width + 2, Math.atan2(-c.tz, c.tx), 'bridge');
+    }
     this.group.add(g);
     b.group = g;
   }

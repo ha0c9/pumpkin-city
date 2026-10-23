@@ -13,8 +13,12 @@ const DETAIL_HALF = 400;
 export const LAYER_DETAIL = 1; // grass & rain: skipped in reflection/refraction passes
 
 const SWELL_GLSL = /* glsl */`
+// Waves shorter than a few pixels (fp = meters per pixel, 0 in the vertex shader) fade out; sampled
+// per pixel they alias into a regular diamond lattice far out at sea.
+float waveKeep(float fp, float L) { return 1.0 - smoothstep(0.05, 0.2, fp / L); }
+
 // Three long Gerstner-like swells; returns height and writes the slope.
-float swell(vec2 p, float t, out vec2 slope) {
+float swell(vec2 p, float t, float fp, out vec2 slope) {
   float h = 0.0; slope = vec2(0.0);
   vec2 d[3]; float L[3]; float A[3];
   d[0] = normalize(vec2(0.8, 0.6)); L[0] = 38.0; A[0] = 0.16;
@@ -24,20 +28,21 @@ float swell(vec2 p, float t, out vec2 slope) {
     float k = 6.28318 / L[i];
     float w = sqrt(9.8 * k);
     float ph = k * dot(d[i], p) - w * t;
-    h += A[i] * sin(ph);
-    slope += d[i] * A[i] * k * cos(ph);
+    float a = A[i] * waveKeep(fp, L[i]);
+    h += a * sin(ph);
+    slope += d[i] * a * k * cos(ph);
   }
   return h;
 }
 
 // Typhoon sea: steep Gerstner waves running with the wind (+x). Returns (dx, height, dz) and the slope.
-vec3 stormWaves(vec2 p, float t, out vec2 slope) {
+vec3 stormWaves(vec2 p, float t, float fp, out vec2 slope) {
   vec3 o = vec3(0.0); slope = vec2(0.0);
   vec2 d[4]; float L[4]; float A[4];
-  d[0] = normalize(vec2(1.0, 0.25)); L[0] = 74.0; A[0] = 1.5;
-  d[1] = normalize(vec2(0.85, -0.5)); L[1] = 47.0; A[1] = 0.85;
-  d[2] = normalize(vec2(0.7, 0.7)); L[2] = 29.0; A[2] = 0.45;
-  d[3] = normalize(vec2(1.0, -0.1)); L[3] = 17.0; A[3] = 0.22;
+  d[0] = normalize(vec2(1.0, 0.25)); L[0] = 92.0; A[0] = 2.3;
+  d[1] = normalize(vec2(0.85, -0.5)); L[1] = 56.0; A[1] = 1.3;
+  d[2] = normalize(vec2(0.7, 0.7)); L[2] = 33.0; A[2] = 0.7;
+  d[3] = normalize(vec2(1.0, -0.1)); L[3] = 19.0; A[3] = 0.34;
   for (int i = 0; i < 4; i++) {
     float k = 6.28318 / L[i];
     float w = sqrt(9.8 * k);
@@ -45,7 +50,7 @@ vec3 stormWaves(vec2 p, float t, out vec2 slope) {
     float q = 0.8 / (k * A[i] * 4.0);
     o.xz += d[i] * q * A[i] * cos(ph);
     o.y += A[i] * sin(ph);
-    slope += d[i] * A[i] * k * cos(ph);
+    slope += d[i] * A[i] * waveKeep(fp, L[i]) * k * cos(ph);
   }
   return o;
 }
@@ -86,11 +91,11 @@ void main() {
   float h = 0.0;
   if (mask > 0.0) h = texture2D(uSimTex, suv).r * mask * dispFade;
   vec2 sl;
-  h += swell(wp.xz, uTime, sl) * amp * dispFade;
+  h += swell(wp.xz, uTime, 0.0, sl) * amp * dispFade;
   vBaseXZ = wp.xz;
   if (uStorm > 0.001) {
     float sAmp = uStorm * smoothstep(0.5, 8.0, depth);
-    vec3 so = stormWaves(wp.xz, uTime, sl);
+    vec3 so = stormWaves(wp.xz, uTime, 0.0, sl);
     wp.xz += so.xz * sAmp * dispFade;
     h += so.y * sAmp * dispFade;
   }
@@ -222,7 +227,7 @@ void main() {
 
   // --- Normal: swell + spectrum detail + simulation + rain ---
   vec2 slope;
-  swell(vWorldPos.xz, uTime, slope);
+  swell(vWorldPos.xz, uTime, footprint, slope);
   // Per pixel, not the interpolated vertex amplitude: the outer skirt's triangles are
   // hundreds of meters wide and would otherwise shade a diagonal seam.
   slope *= uSwell * smoothstep(0.3, 6.0, depth);
@@ -230,7 +235,7 @@ void main() {
   float stormH = 0.0;
   if (stormAmp > 0.001) {
     vec2 ss;
-    vec3 so = stormWaves(vBaseXZ, uTime, ss);
+    vec3 so = stormWaves(vBaseXZ, uTime, footprint, ss);
     slope += ss * stormAmp;
     stormH = so.y * stormAmp;
   }
@@ -296,7 +301,7 @@ void main() {
   col += aces(uSunColor * spec * uSpecular * sunUp * (1.0 - uRain * 0.85));
 
   // --- Shore foam ---
-  float foamBand = smoothstep(0.9 + uStorm * 3.2, 0.05, depth);
+  float foamBand = smoothstep(0.9 + uStorm * 4.5, 0.05, depth);
   float waveLines = sin(depth * (9.0 - uStorm * 6.0) - uTime * (2.2 + uStorm * 1.8) + vnoise(vWorldPos.xz * 0.4) * 4.0) * 0.5 + 0.5;
   float foamNoise = vnoise(vWorldPos.xz * 1.3 + uTime * 0.3) * vnoise(vWorldPos.xz * 0.5 - uTime * 0.2);
   float foam = foamBand * smoothstep(0.35, 0.85, waveLines * 0.6 + foamNoise * 0.9);
@@ -307,10 +312,10 @@ void main() {
   foam = max(foam, crest * (0.35 + uRain * 0.4) * vnoise(vWorldPos.xz * 0.8 + uTime * 0.5));
   if (uStorm > 0.001) {
     // Breaking crests and wind-blown foam streaks.
-    float breakers = smoothstep(1.0, 2.2, stormH) * vnoise(vWorldPos.xz * 0.35 + uTime * 0.8);
+    float breakers = smoothstep(1.5, 3.2, stormH) * vnoise(vWorldPos.xz * 0.35 + uTime * 0.8);
     vec2 sp = vec2(dot(vBaseXZ, vec2(0.97, 0.24)) * 0.05 - uTime * 0.35, dot(vBaseXZ, vec2(-0.24, 0.97)) * 0.7);
     float streaks = smoothstep(0.62, 0.85, vnoise(sp) * 0.7 + vnoise(sp * 2.3 + 4.1) * 0.4);
-    foam = max(foam, uStorm * smoothstep(3.0, 8.0, depth) * (breakers * 1.3 + streaks * 0.45));
+    foam = max(foam, uStorm * smoothstep(3.0, 8.0, depth) * (breakers * 1.4 + streaks * 0.6));
   }
   col = mix(col, aces(lightCol * 1.05), clamp(foam, 0.0, 1.0) * 0.85);
 
@@ -369,6 +374,8 @@ export class Water {
     this.uniforms.uReflTex.value = this.reflRT.texture;
     this.uniforms.uRefrTex.value = this.refrRT.texture;
     this.uniforms.uDepthTex.value = terrain.depthTexture;
+    // Same for the reflection matrix: renderPasses() writes into this.reflMatrix every frame.
+    this.uniforms.uReflMatrix.value = this.reflMatrix;
     // Share live uniforms with the rest of the world.
     this.uniforms.uTime = u.uTime;
     this.uniforms.uRain = u.uRain;
@@ -452,7 +459,7 @@ export class Water {
     this.uniforms.uExposure.value = this.ctx.renderer.toneMappingExposure;
     const rain = this.ctx.uniforms.uRain.value;
     this.uniforms.uSwell.value = 1 + rain * 0.9;
-    this.uniforms.uWind.value = 1 + rain * 0.35 + this.ctx.uniforms.uStorm.value * 0.9;
+    this.uniforms.uWind.value = 1 + rain * 0.35 + this.ctx.uniforms.uStorm.value * 1.3;
   }
 
   /** Render reflection and refraction textures. Call before the main render. */
