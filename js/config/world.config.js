@@ -46,11 +46,30 @@ export const ISLANDS = [
 
 export const WATER = {
   size: 7000,
-  shallowColor: [0.10, 0.78, 0.74],  // turquoise near the beach
+  shallowColor: [0.12, 0.80, 0.68],  // turquoise near the beach
   midColor: [0.03, 0.42, 0.62],
-  deepColor: [0.012, 0.075, 0.26],   // sapphire offshore
+  deepColor: [0.010, 0.060, 0.20],   // sapphire offshore
   simSize: 560,     // the GPU ripple simulation follows the camera and covers simSize x simSize meters
   maxDepth: 16,
+};
+
+/**
+ * Detail waves (js/world/WaveSpectrum.js): two tileable spectra re-baked on the GPU every frame,
+ * each wave moving at its deep-water speed sqrt(g k). Slope variances follow Cox-Munk for a
+ * ~5 m/s breeze (total mean squared slope ≈ 0.003 + 0.00512 · U ≈ 0.029).
+ */
+export const WAVES = {
+  tileA: 72,          // meters per chop tile (wavelengths 24 m .. 2.4 m)
+  tileB: 9,           // meters per ripple tile (wavelengths 3 m .. 0.3 m)
+  count: 48,          // waves per tile
+  windAngle: 0.53,    // radians from +X
+  slopeVarA: 0.016,   // mean squared slope of each tile; raise both for a rougher sea
+  slopeVarB: 0.010,
+  slope: 1.0,         // global multiplier on the detail slopes (rain adds up to +35%)
+  microRough: 0.0015, // sub-pixel capillary roughness: sets how sharp the closest sun sparkles are
+  specular: 0.8,      // sun glitter intensity
+  reflDistort: [0.02, 0.07], // reflection offset per unit slope in screen uv: [horizontal, vertical]
+  absorb: [0.45, 0.075, 0.055], // per-meter absorption (r, g, b): shallow water over sand turns turquoise
 };
 
 export const SKY = {
@@ -77,6 +96,7 @@ export const QUALITY = IS_MOBILE ? {
   terrainCell: 3,
   waterSegments: 200,
   simResolution: 256,
+  waveTexSize: 256,
   reflectionScale: 0.35,
   refractionScale: 0.4,
   grassCount: 14000,
@@ -92,6 +112,7 @@ export const QUALITY = IS_MOBILE ? {
   terrainCell: 2,
   waterSegments: 340,
   simResolution: 512,
+  waveTexSize: 512,
   reflectionScale: 0.5,
   refractionScale: 0.6,
   grassCount: 45000,
