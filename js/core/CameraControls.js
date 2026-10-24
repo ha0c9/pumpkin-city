@@ -9,6 +9,7 @@
 //   touch  — a floating joystick appears wherever the left half of the screen is touched; dragging elsewhere looks
 //            around (the view turns the way the finger moves); pinch zooms the lens
 //   mouse  — drag to look, wheel zooms the lens; keys WASD move, Shift runs, E/Q (Space/C) fly up/down
+// Gamepad (see Gamepad.js): left stick moves, right stick turns / tilts (looks in walk), triggers zoom (fly in walk).
 // Hold-buttons (zoom / rotate / vertical) are driven through `hold` and `vertical` by the UI.
 const THREE = window.THREE;
 const { clamp } = THREE.MathUtils;
@@ -46,6 +47,7 @@ export class CameraControls {
     this.joystick = { x: 0, y: 0 };
     this.vertical = 0;
     this.hold = { zoom: 0, rotate: 0 };
+    this.pad = { lx: 0, ly: 0, rx: 0, ry: 0, zoom: 0, lens: 0, run: false };   // written by GamepadInput
     this.anim = null;
     this.listeners = [];
     this._ray = new THREE.Raycaster();
@@ -392,9 +394,29 @@ export class CameraControls {
     up += this.vertical;
     turn += this.hold.rotate;
     const stickRun = Math.hypot(this.joystick.x, this.joystick.y) > 0.92;
+    const pad = this.pad;
+    fwd -= pad.ly;
+    strafe += pad.lx;
+    up += pad.zoom;
+    this._padLook(dt);
 
-    if (this.mode === 'orbit') this._updateOrbit(dt, fwd, strafe, up, turn, run);
-    else this._updateWalk(dt, fwd, strafe, up, turn, run || stickRun);
+    if (this.mode === 'orbit') this._updateOrbit(dt, fwd, strafe, up, turn, run || pad.run);
+    else this._updateWalk(dt, fwd, strafe, up, turn, run || stickRun || pad.run);
+  }
+
+  /** Right stick: squared response for fine aim near the centre, full deflection turns quickly. */
+  _padLook(dt) {
+    const { rx, ry, lens } = this.pad;
+    const cx = rx * Math.abs(rx), cy = ry * Math.abs(ry);
+    if (this.mode === 'orbit') {
+      if (cx) this.goalTheta -= cx * dt * 2.2;
+      if (cy) this.goalPhi = clamp(this.goalPhi - cy * dt * 1.3, this.minPhi, this.maxPhi);
+    } else {
+      const k = this.walkFov / WALK_FOV;
+      if (cx) this.yaw -= cx * dt * 2.6 * k;
+      if (cy) this.pitch = clamp(this.pitch - cy * dt * 1.8 * k, -1.45, 1.45);
+      if (lens) this.walkFov = clamp(this.walkFov * Math.exp(-lens * dt * 1.2), 18, 80);
+    }
   }
 
   _updateOrbit(dt, fwd, strafe, up, turn, run) {

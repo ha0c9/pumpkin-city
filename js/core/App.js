@@ -3,6 +3,7 @@ import { QUALITY } from '../config/world.config.js';
 import { OccupancyMask } from './Mask.js';
 import { CameraControls } from './CameraControls.js';
 import { Interaction } from './Interaction.js';
+import { GamepadInput } from './Gamepad.js';
 import { lerp, clamp } from './Utils.js';
 import { Terrain } from '../world/Terrain.js';
 import { Water, LAYER_DETAIL } from '../world/Water.js';
@@ -110,6 +111,7 @@ export class App {
     this.time = 0;
     this._frame();
     ui.bind(this);
+    this.gamepad = new GamepadInput({ controls: this.controls, interaction: this.interaction, env: this.env, ui, places: this.places });
     ui.progress(1, '欢迎来到南瓜岛');
     await nextFrame();
     ui.done();
@@ -148,6 +150,7 @@ export class App {
       const info = b.group.userData.pick;
       places.push({ name: b.cfg.name, tag: '桥梁', info });
     }
+    this.places = places;
     this.ui.setPlaces(places, (p) => {
       it.focusOn(p.info);
       this.ui.showInfo(p.info, () => it.focusOn(p.info));
@@ -171,6 +174,7 @@ export class App {
     const u = ctx.uniforms;
     u.uTime.value = this.time;
 
+    this.gamepad?.update(dt);
     this.controls.update(dt);
     if (this.interaction.followTarget && this.controls.mode === 'orbit' && !this.controls.anim) {
       this.controls.goalTarget.lerp(this.interaction.followTarget.position, Math.min(1, dt * 2));

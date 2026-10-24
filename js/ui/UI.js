@@ -56,10 +56,28 @@ export class UI {
 
   /** Gesture help card. Shown once per mode on first use, or on demand from the panel. */
   showTips(mode, force = false) {
-    const key = `tips.${mode}.${this.isTouch ? 'touch' : 'mouse'}`;
+    const key = `tips.${mode}.${this.gamepad ? 'gamepad' : this.isTouch ? 'touch' : 'mouse'}`;
     if (!force && this._store(key) === '1') return;
     const touch = this.isTouch;
-    const rows = mode === 'walk'
+    const rows = this.gamepad ? (mode === 'walk' ? [
+      ['左摇杆', '前进后退、左右平移（按下左摇杆奔跑）'],
+      ['右摇杆', '环顾四周'],
+      ['RT / LT', '升空 / 下降'],
+      ['RB / LB', '拉近 / 拉远镜头'],
+      ['A', '查看屏幕中央的名称，连按两下瞬移过去'],
+      ['Y', '切换回环绕模式'],
+    ] : [
+      ['左摇杆', '平移地图（按下左摇杆加速）'],
+      ['右摇杆', '左右旋转视角，上下调整俯仰'],
+      ['RT / LT', '拉近 / 拉远'],
+      ['A', '查看屏幕中央的名称，连按两下飞过去'],
+      ['LB / RB', '上一个 / 下一个地点'],
+      ['Y', '切换到漫游模式'],
+    ]).concat([
+      ['B / X', '关闭信息卡 / 复位朝北'],
+      ['十字键', '← → 调整时间，↑ ↓ 切换天气'],
+      ['☰ / ⧉', '设置面板 / 本说明'],
+    ]) : mode === 'walk'
       ? (touch ? [
         ['左半屏', '按住任意位置出现摇杆，向前推前进，推到底奔跑'],
         ['右半屏滑动', '环顾四周：向左滑向左看，向上滑向上看'],
