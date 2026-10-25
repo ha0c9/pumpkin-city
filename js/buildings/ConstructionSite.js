@@ -197,6 +197,7 @@ registerBuilding('constructionSite', {
         category: '工厂 Factory',
         name: '南湾机械厂', nameEn: 'Nanwan Works',
         description: '南湾岛上的机械厂，离南瓜中心岛隔着一湾海水。锯齿厂房、两层办公楼、两座筒仓、烟囱和临街的装卸月台。',
+        featured: true,
       };
     }
     return {
