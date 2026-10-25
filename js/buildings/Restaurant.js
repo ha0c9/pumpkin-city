@@ -1,4 +1,4 @@
-// 南瓜大道餐馆 — two-storey neighbourhood restaurant. Ground and upper floors are dining rooms
+// 南瓜大道意面馆 — two-storey pasta house. Ground and upper floors are dining rooms
 // (tables set for service); a stair against the left wall climbs to the second floor.
 // Built the same way as the other buildings: boxes, canvas signs, shared materials.
 import { registerBuilding } from '../core/Registry.js';
@@ -23,10 +23,10 @@ function signTexture() {
   x.fillStyle = '#fff8ee';
   x.textAlign = 'center'; x.textBaseline = 'middle';
   x.font = 'bold 108px "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif';
-  x.fillText('南瓜大道餐馆', 512, 100);
+  x.fillText('南瓜大道意面馆', 512, 100);
   x.font = 'bold 48px "Arial","Helvetica Neue",sans-serif';
   x.fillStyle = '#f3d48a';
-  x.fillText('PUMPKIN AVENUE  ·  BISTRO', 512, 188);
+  x.fillText('PUMPKIN AVENUE  ·  PASTA', 512, 188);
   return canvasTexture(c, { anisotropy: 8 });
 }
 
@@ -169,14 +169,14 @@ export function buildRestaurant(ctx) {
 }
 
 registerBuilding('restaurant', {
-  label: '餐馆 Restaurant',
+  label: '意面馆 Pasta',
   footprint: [14, 11],
   create(ctx, spec) { return buildRestaurant(ctx, spec); },
   info() {
     return {
-      category: '餐馆 Restaurant',
-      name: '南瓜大道餐馆', nameEn: 'Pumpkin Avenue Bistro',
-      description: '两层小餐馆。一楼和二楼都摆着餐桌，左墙的楼梯通到二楼，临街两面是玻璃，从外面就能看见里面。',
+      category: '意面馆 Pasta',
+      name: '南瓜大道意面馆', nameEn: 'Pumpkin Avenue Pasta',
+      description: '两层意面馆。一楼和二楼都摆着餐桌，左墙的楼梯通到二楼，临街两面是玻璃，从外面就能看见里面。',
       featured: true,
     };
   },

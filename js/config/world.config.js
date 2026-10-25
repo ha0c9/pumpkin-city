@@ -48,6 +48,12 @@ export const ISLANDS = [
     blobs: [[520, -365, 98], [598, -418, 60], [448, -412, 60], [528, -280, 54], [610, -332, 46], [490, -468, 46], [555, -440, 55], [620, -450, 48], [655, -510, 90], [590, -530, 62], [710, -470, 55]],
     hills: [],
   },
+  {
+    // Reserved for a future airport: long and flat, no hills, southwest of the central island.
+    id: 'airport', name: '机场岛', nameEn: 'Airport Isle', x: -540, z: 600, seed: 79, coast: 16, ground: 2.4,
+    blobs: [[-690, 580, 145], [-520, 610, 190], [-330, 580, 155], [-640, 740, 125], [-420, 740, 120], [-560, 470, 80]],
+    hills: [],
+  },
 ];
 
 export const WATER = {

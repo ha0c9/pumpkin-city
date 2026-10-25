@@ -49,9 +49,20 @@ registerBuilding('fulaiTower', {
     const signMat = new THREE.MeshStandardMaterial({ map: signTex, transparent: true, emissive: 0xffffff, emissiveMap: signTex, emissiveIntensity: 0.2 });
     ctx.nightMaterials.push({ material: signMat, intensity: 1.3, base: 0.2 });
     mesh(g, new THREE.PlaneGeometry(14, 3.5), signMat, 0, 8.3, 15.33, { cast: false });
-    // Entrance canopy.
+    // Entrance canopy and the lobby doors under it. A stone bay covers the curtain wall
+    // so the doors read as an entrance instead of glass running down to the plaza.
     box(g, 12, 0.5, 4, 0, 5.2, 17, gold);
     for (const sx of [-5.5, 5.5]) box(g, 0.3, 5, 0.3, sx, 2.7, 18.7, gold);
+    const stone = sharedMaterial('stone');
+    const doorGlass = sharedMaterial('glassClear');
+    box(g, 7.4, 4.7, 0.4, 0, 2.65, 15.1, stone);
+    box(g, 4.6, 3.7, 0.16, 0, 2.2, 15.32, gold);
+    box(g, 1.7, 3.2, 0.08, -0.95, 1.95, 15.46, doorGlass);
+    box(g, 1.7, 3.2, 0.08, 0.95, 1.95, 15.46, doorGlass);
+    box(g, 0.1, 3.2, 0.12, 0, 1.95, 15.5, gold);
+    box(g, 1.6, 0.55, 0.08, 0, 3.9, 15.46, doorGlass);
+    for (const hx of [-0.22, 0.22]) box(g, 0.08, 0.72, 0.08, hx, 1.75, 15.56, gold);
+    box(g, 5.2, 0.14, 1.6, 0, 0.28, 16.2, stone);
 
     // Three twisting octagonal tiers.
     const tiers = [[15, 48, 0], [13, 36, Math.PI / 24], [10.5, 26, Math.PI / 12]];

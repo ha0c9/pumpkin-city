@@ -75,7 +75,19 @@ export function buildFactory(ctx, spec) {
   office.castShadow = true; office.receiveShadow = true;
   g.add(office);
   box(g, offW + 0.4, 0.35, offD + 0.4, ox, floors * floorH + 0.4, oz, concrete);
-  box(g, 2.2, 2.4, 0.15, ox, 1.4, oz + offD / 2 + 0.05, dark);
+  // Ground-floor entrance set into a plain wall bay, so the door is not painted over the windows.
+  const frontZ = oz + offD / 2;
+  box(g, 4.8, 3.4, 0.24, ox, 1.9, frontZ + 0.02, concrete);
+  box(g, 3.15, 2.95, 0.12, ox, 1.7, frontZ + 0.16, dark);
+  const leaf = colorMat(0x1a3344, { roughness: 0.4, metalness: 0.45 });
+  const doorGlass = sharedMaterial('glassClear');
+  for (const side of [-1, 1]) {
+    box(g, 1.28, 2.6, 0.08, ox + side * 0.7, 1.55, frontZ + 0.24, leaf);
+    box(g, 0.72, 1.15, 0.04, ox + side * 0.7, 1.9, frontZ + 0.3, doorGlass);
+    box(g, 0.06, 0.7, 0.06, ox + side * 0.12, 1.45, frontZ + 0.32, yellow);
+  }
+  box(g, 4.4, 0.14, 1.5, ox, 3.55, frontZ + 0.7, roofMat);
+  box(g, 3.4, 0.12, 1.2, ox, 0.18, frontZ + 0.75, concrete);
 
   const signTex = textTexture(['南湾机械厂', 'NANWAN WORKS'], {
     width: 1024, height: 280, bg: '#1e3d52', color: '#f4f7f8',

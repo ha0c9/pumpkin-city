@@ -49,6 +49,11 @@ export const ROADS = [
   // --- 东方明珠岛 ---
   { id: 'mingzhu', name: '明珠路', nameEn: 'Mingzhu Rd', from: [500, -275], to: [500, -460], lanes: 2 },
   { id: 'lujiazui', name: '陆家嘴路', nameEn: 'Lujiazui Rd', from: [442, -370], to: [606, -370], lanes: 2 },
+
+  // --- 南瓜中心岛 southwest exit, and the reserved airport island ---
+  { id: 'airport-approach', name: '机场路', nameEn: 'Airport Rd', from: [-150, 130], to: [-150, 168], lanes: 2 },
+  { id: 'airport-rd', name: '机场路', nameEn: 'Airport Rd', from: [-520, 430], to: [-520, 780], lanes: 2 },
+  { id: 'airport-cross', name: '翔云路', nameEn: 'Xiangyun Rd', from: [-680, 660], to: [-360, 660], lanes: 2 },
 ];
 
 /**
@@ -64,6 +69,7 @@ export const BRIDGES = [
   { id: 'bridge-west', name: '西岭大桥', nameEn: 'West Ridge Bridge', from: [-150, 0], dir: [-1, 0], to: 'west', end: [-410, -60], endDir: [-1, 0], lanes: 4, style: 'beam' },
   { id: 'bridge-south', name: '南湾拱桥', nameEn: 'South Cove Arch Bridge', from: [0, 130], dir: [0, 1], to: 'south', end: [80, 408], endDir: [0, 1], lanes: 2, style: 'arch' },
   { id: 'bridge-pearl', name: '明珠大桥', nameEn: 'Pearl Cable Bridge', from: [490, -40], dir: [0, -1], to: 'pearl', end: [500, -275], endDir: [0, -1], lanes: 2, style: 'cable' },
+  { id: 'bridge-airport', name: '机场大桥', nameEn: 'Airport Bridge', from: [-150, 168], dir: [0, 1], to: 'airport', end: [-520, 430], endDir: [0, 1], lanes: 2, style: 'cable' },
 ];
 
 /** Landmark buildings with fixed positions. `type` must be registered in js/buildings/index.js. */
@@ -234,6 +240,7 @@ export const ANIMALS = [
   { type: 'duck', count: 4, near: 'south' },
   { type: 'duck', count: 4, near: 'central' },
   { type: 'rabbit', count: 2, island: 'pearl' },
+  { type: 'rabbit', count: 3, island: 'airport' },
   { type: 'gull', count: 10 },
   { type: 'squirrel', count: 4, island: 'east' },
   { type: 'squirrel', count: 3, island: 'north' },
