@@ -167,9 +167,9 @@ registerBuilding('convenienceStore', {
   info(spec) {
     if (isRestaurantLot(spec)) {
       return {
-        category: '餐馆 Restaurant',
-        name: '南瓜大道餐馆', nameEn: 'Pumpkin Avenue Bistro',
-        description: '两层小餐馆。一楼和二楼都摆着餐桌，左墙的楼梯通到二楼，临街两面是玻璃，从外面就能看见里面。',
+        category: '意面馆 Pasta',
+        name: '南瓜大道意面馆', nameEn: 'Pumpkin Avenue Pasta',
+        description: '两层意面馆。一楼和二楼都摆着餐桌，左墙的楼梯通到二楼，临街两面是玻璃，从外面就能看见里面。',
         featured: true,
       };
     }

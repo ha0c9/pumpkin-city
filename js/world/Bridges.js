@@ -142,7 +142,7 @@ export class Bridges {
     g.name = b.id;
     const segs = Math.max(16, Math.ceil(b.L / 2));
     const hc = b.carriage / 2, hw = b.width / 2;
-    const thick = b.cfg.style === 'beam' ? 1.8 : 1.1;
+    const thick = b.cfg.style === 'viaduct' ? 1.9 : b.cfg.style === 'beam' ? 1.8 : 1.1;
     const rt = roadTexture(b.lanes, ROAD_STYLE.laneWidth);
     const roadMat = new THREE.MeshStandardMaterial({ map: rt.texture, roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -1 });
     this.ctx.wetMaterials.push({ material: roadMat, dry: 0.85, wet: 0.22 });
@@ -212,6 +212,42 @@ export class Bridges {
     if (b.cfg.style === 'beam') {
       const n = Math.max(2, Math.round(b.L / 18));
       for (let i = 1; i < n; i++) pier(i / n);
+    } else if (b.cfg.style === 'viaduct') {
+      // A bend cannot be cable-stayed: the stays would leave the vertical plane.
+      // Real curved sea bridges are continuous concrete box girders on piers
+      // (双柱墩 + 水中承台), with the cap beam kept square to the local tangent.
+      const spans = Math.max(4, Math.round(b.L / 46));
+      const inset = hw - 2.2;
+      for (let i = 1; i < spans; i++) {
+        const s = i / spans;
+        const top = b.deckY(s) - thick;
+        const mid = b.point(s, 0, 0);
+        const cap = new THREE.Mesh(this.unitBox, this.mats.concrete);
+        cap.position.set(mid.x, top - 0.65, mid.z);
+        cap.scale.set(b.width - 0.6, 1.3, 2.8);
+        cap.rotation.y = b.heading(s);
+        cap.castShadow = true;
+        g.add(cap);
+        let deepest = 0;
+        for (const side of [-1, 1]) {
+          const p = b.point(s, side * inset, 0);
+          const foot = p.clone();
+          foot.y = seabedAt(p);
+          deepest = Math.min(deepest, foot.y);
+          const head = p.clone();
+          head.y = top - 1.3;
+          if (head.y > foot.y + 0.4) rods.concrete.push(rodMatrix(foot, head, 1.15));
+        }
+        // Pile cap sits in the water; the shafts stay visible up to the cap beam.
+        if (deepest < -3) {
+          const pile = new THREE.Mesh(this.unitBox, this.mats.concrete);
+          pile.position.set(mid.x, 0.15, mid.z);
+          pile.scale.set(inset * 2 + 3.2, 1.3, 6.2);
+          pile.rotation.y = b.heading(s);
+          pile.castShadow = true;
+          g.add(pile);
+        }
+      }
     } else if (b.cfg.style === 'arch') {
       pier(0.08); pier(0.92);
       const archH = Math.min(16, b.L * 0.22);
@@ -299,7 +335,7 @@ export class Bridges {
 
     const info = {
       id: b.id, name: b.cfg.name, nameEn: b.cfg.nameEn, category: '桥梁 Bridge',
-      description: `连接${b.fromIsland ? b.fromIsland.name : ''}与${b.toIsland.name}，全长约 ${Math.round(b.L)} 米，${b.lanes} 车道，双侧人行道。${bridgeSlope(b)}`,
+      description: `连接${b.fromIsland ? b.fromIsland.name : ''}与${b.toIsland.name}，全长约 ${Math.round(b.L)} 米，${b.lanes} 车道，双侧人行道。${b.cfg.style === 'viaduct' ? '弯桥用混凝土连续箱梁，桥墩沿曲线排列。' : ''}${bridgeSlope(b)}`,
     };
     g.traverse((o) => { o.userData.pick = info; });
     const mid = b.point(0.5, 0, 0);

@@ -40,7 +40,7 @@ export class BridgePath {
     this.hA = field.heightAt(...this.A);
     this.hB = field.heightAt(...this.B);
     // A bridge that already climbs to a higher island needs little extra crown over the water.
-    const crown = { arch: 2.6, cable: 4.5, beam: 3.4 }[cfg.style] || 3;
+    const crown = { arch: 2.6, cable: 4.5, beam: 3.4, viaduct: 7 }[cfg.style] || 3;
     this.rise = crown * Math.min(1, Math.max(0.15, 1 - Math.abs(this.hB - this.hA) / 7));
 
     // Hermite tangents scaled to the chord give a gentle S when the ends are offset sideways.
