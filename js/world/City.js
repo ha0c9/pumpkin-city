@@ -104,7 +104,7 @@ export class City {
       height,
       focus: [x, y + Math.min(height * 0.45, 40), z],
       radius: Math.max(height * 1.25, Math.max(fp[0], fp[1]) * 1.3, 30),
-      landmark: !['pocketPark', 'cornerGarden'].includes(spec.type),
+      landmark: !['pocketPark', 'cornerGarden', 'schoolAheadSign'].includes(spec.type),
       featured: !!spec.name || !!extra.featured,
       minor: MINOR_TYPES.includes(spec.type) && !extra.featured,
     };
