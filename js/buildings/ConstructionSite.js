@@ -3,6 +3,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { textTexture, makeCanvas, canvasTexture, rodMatrix, instancedFrom } from '../core/Utils.js';
 import { sharedMaterial, colorMat, box, tiledBox, mesh } from './materials.js';
+import { isFactoryLot, buildFactory } from './Factory.js';
 
 const THREE = window.THREE;
 
@@ -47,6 +48,13 @@ registerBuilding('constructionSite', {
   label: '建筑工地 Construction Site',
   footprint: [40, 34],
   create(ctx, spec, rng) {
+    // The far site on 南湾岛 is the factory. Consume the two rng draws this site would
+    // have used, so the other construction sites keep their frames and crane motion.
+    if (isFactoryLot(spec)) {
+      rng();
+      rng();
+      return buildFactory(ctx, spec);
+    }
     const g = new THREE.Group();
     const [W, D] = spec.size || [40, 34];
     const yellow = colorMat(0xf2b707, { roughness: 0.5, metalness: 0.3 });
@@ -184,6 +192,13 @@ registerBuilding('constructionSite', {
     return g;
   },
   info(spec) {
+    if (isFactoryLot(spec)) {
+      return {
+        category: '工厂 Factory',
+        name: '南湾机械厂', nameEn: 'Nanwan Works',
+        description: '南湾岛上的机械厂，离南瓜中心岛隔着一湾海水。锯齿厂房、两层办公楼、两座筒仓、烟囱和临街的装卸月台。',
+      };
+    }
     return {
       name: '建筑工地', nameEn: 'Construction Site',
       description: `正在建设中的新项目（地块约 ${Math.round(spec.size?.[0] || 40)}×${Math.round(spec.size?.[1] || 34)} 米），塔吊正在吊运钢筋。后续版本这里会出现新的建筑。`,

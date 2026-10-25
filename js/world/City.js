@@ -99,7 +99,7 @@ export class City {
       type: spec.type,
       name: spec.name || extra.name || defaults.name || def.label,
       nameEn: spec.nameEn || extra.nameEn || defaults.nameEn || '',
-      category: def.label,
+      category: extra.category || def.label,
       description: spec.description || extra.description || defaults.description || '',
       height,
       focus: [x, y + Math.min(height * 0.45, 40), z],
