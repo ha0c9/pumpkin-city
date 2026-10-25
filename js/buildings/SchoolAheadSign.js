@@ -110,6 +110,35 @@ function signTexture() {
   return canvasTexture(c, { anisotropy: 8 });
 }
 
+/** Solid triangle and plate, so the board has an edge when seen from the side. */
+function boardMesh(shape, color) {
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.1, bevelEnabled: false });
+  geo.translate(0, 0, -0.05);
+  const m = new THREE.Mesh(geo, colorMat(color, { roughness: 0.6 }));
+  m.castShadow = true;
+  return m;
+}
+
+function signShapes() {
+  const s = 1.72 / 640;
+  const p = (px, py) => [(px - 320) * s, (450 - py) * s];
+  const tri = new THREE.Shape();
+  const [ax, ay] = p(320, 28), [lx, ly] = p(36, 520), [rx, ry] = p(604, 520);
+  tri.moveTo(ax, ay); tri.lineTo(rx, ry); tri.lineTo(lx, ly); tri.closePath();
+  const x0 = (28 - 320) * s, y0 = (450 - 848) * s, w = 584 * s, h = 300 * s, r = 36 * s;
+  const plate = new THREE.Shape();
+  plate.moveTo(x0 + r, y0);
+  plate.lineTo(x0 + w - r, y0);
+  plate.quadraticCurveTo(x0 + w, y0, x0 + w, y0 + r);
+  plate.lineTo(x0 + w, y0 + h - r);
+  plate.quadraticCurveTo(x0 + w, y0 + h, x0 + w - r, y0 + h);
+  plate.lineTo(x0 + r, y0 + h);
+  plate.quadraticCurveTo(x0, y0 + h, x0, y0 + h - r);
+  plate.lineTo(x0, y0 + r);
+  plate.quadraticCurveTo(x0, y0, x0 + r, y0);
+  return { tri, plate };
+}
+
 export function buildSchoolAheadSign(ctx) {
   const g = new THREE.Group();
   const tex = signTexture();
@@ -118,11 +147,21 @@ export function buildSchoolAheadSign(ctx) {
     emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.12,
   });
   ctx.nightMaterials.push({ material: face, intensity: 0.45, base: 0.12 });
-  const board = new THREE.Mesh(new THREE.PlaneGeometry(1.72, 2.42), face);
-  board.position.set(0, 2.42, 0.05);
-  board.castShadow = true;
+
+  const { tri, plate } = signShapes();
+  const board = new THREE.Group();
+  board.add(boardMesh(tri, 0xf5c518));
+  board.add(boardMesh(plate, 0x141414));
+  const front = new THREE.Mesh(new THREE.PlaneGeometry(1.72, 2.42), face);
+  front.position.z = 0.06;
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(1.72, 2.42), face);
+  back.position.z = -0.06;
+  back.rotation.y = Math.PI;
+  board.add(front, back);
+  board.position.y = 2.42;
   g.add(board);
-  mesh(g, new THREE.CylinderGeometry(0.045, 0.055, 2.15, 8), sharedMaterial('darkSteel'), 0, 1.1, -0.02);
+
+  mesh(g, new THREE.CylinderGeometry(0.045, 0.055, 2.15, 8), sharedMaterial('darkSteel'), 0, 1.1, 0);
   box(g, 0.55, 0.12, 0.4, 0, 0.06, 0, colorMat(0xb7b1a6, { roughness: 0.9 }), { cast: false });
   g.userData.height = 3.7;
   g.userData.treeSpots = [];
