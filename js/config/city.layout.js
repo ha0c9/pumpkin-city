@@ -99,6 +99,14 @@ export const LANDMARKS = [
     position: [-112.5, 34.2], rotation: PI / 2,
   },
   {
+    type: 'schoolAheadSign', id: 'school-ahead-north',
+    position: [-82.3, 10.4], rotation: PI,
+  },
+  {
+    type: 'schoolAheadSign', id: 'school-ahead-south',
+    position: [-67.9, 58.05], rotation: 0,
+  },
+  {
     type: 'homeInn', id: 'home-inn',
     name: '如家酒店', nameEn: 'Home Inn',
     description: '简约舒适的经济型连锁酒店，明黄色立面与蓝色招牌，共 6 层 120 间客房。',
@@ -151,6 +159,12 @@ export const LANDMARKS = [
     name: '福来大厦', nameEn: 'Fulai Tower',
     description: '香槟金色的八角形超高层，三段逐级扭转退台，顶部是镂空金冠与发光的"福"字灯笼，寓意福气到来。',
     position: [455, -412], rotation: 0,
+  },
+  {
+    type: 'equestrianCenter', id: 'pearl-equestrian',
+    name: '明珠马术训练场', nameEn: 'Pearl Equestrian Centre',
+    description: '东方明珠岛南侧的马术训练场。一栋马棚、一间两层办公室，旁边是两个椭圆形训练场：一场走盛装舞步，一场摆着障碍和踩杆，场里有小马在绕圈训练。',
+    position: [638, -502], rotation: 0, footprint: [74, 52],
   },
 ];
 
