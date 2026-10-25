@@ -99,14 +99,14 @@ export class City {
       type: spec.type,
       name: spec.name || extra.name || defaults.name || def.label,
       nameEn: spec.nameEn || extra.nameEn || defaults.nameEn || '',
-      category: def.label,
+      category: extra.category || def.label,
       description: spec.description || extra.description || defaults.description || '',
       height,
       focus: [x, y + Math.min(height * 0.45, 40), z],
       radius: Math.max(height * 1.25, Math.max(fp[0], fp[1]) * 1.3, 30),
       landmark: !['pocketPark', 'cornerGarden'].includes(spec.type),
-      featured: !!spec.name,
-      minor: MINOR_TYPES.includes(spec.type),
+      featured: !!spec.name || !!extra.featured,
+      minor: MINOR_TYPES.includes(spec.type) && !extra.featured,
     };
     obj.userData.pick = info;
     obj.traverse((o) => { o.userData.pick = info; });

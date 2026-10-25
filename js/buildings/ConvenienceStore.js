@@ -3,6 +3,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { makeCanvas, canvasTexture } from '../core/Utils.js';
 import { sharedMaterial, colorMat, box, tiledBox } from './materials.js';
+import { isRestaurantLot, buildRestaurant } from './Restaurant.js';
 
 const THREE = window.THREE;
 
@@ -84,6 +85,13 @@ registerBuilding('convenienceStore', {
   label: '便利店 Convenience Store',
   footprint: [14, 11],
   create(ctx, spec, rng) {
+    // One existing Lawson lot is the restaurant. Burn the same rng draws the shelves would,
+    // so the other stores keep their branch names and shelf layouts.
+    if (isRestaurantLot(spec)) {
+      BRANCHES[Math.floor(rng() * BRANCHES.length)];
+      shelvesTexture(rng);
+      return buildRestaurant(ctx, spec);
+    }
     const g = new THREE.Group();
     const branch = spec.branch || BRANCHES[Math.floor(rng() * BRANCHES.length)];
     spec.branchName = branch;
@@ -157,6 +165,14 @@ registerBuilding('convenienceStore', {
     return g;
   },
   info(spec) {
+    if (isRestaurantLot(spec)) {
+      return {
+        category: '餐馆 Restaurant',
+        name: '南瓜大道餐馆', nameEn: 'Pumpkin Avenue Bistro',
+        description: '两层小餐馆。一楼和二楼都摆着餐桌，左墙的楼梯通到二楼，临街两面是玻璃，从外面就能看见里面。',
+        featured: true,
+      };
+    }
     return {
       name: `罗森便利店 ${spec.branchName}`, nameEn: 'LAWSON Convenience Store',
       description: '24 小时营业的罗森便利店：关东煮、饭团便当、甜品咖啡与日用品，标志性的蓝色牛奶罐招牌。',
