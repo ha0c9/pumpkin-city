@@ -177,7 +177,7 @@ export const LANDMARKS = [
   {
     type: 'airport', id: 'pumpkin-airport',
     name: '南瓜机场', nameEn: 'Pumpkin Airport',
-    description: '两座航站楼沿岛的长边排开，圆弧玻璃顶、两层幕墙，下层开门、上层接廊桥，楼里有电梯。塔台在航站楼侧面的空地上。南北各有一组跑道，飞机起飞和降落。',
+    description: '两座航站楼沿岛的长边排开，圆弧玻璃顶、两层幕墙，下层开门、上层接廊桥，楼里有电梯。塔台在航站楼侧面的空地上。飞机起飞后直飞到天边，再从天边进场降落。台风天停飞，天气转好后恢复。',
     position: [-500, 575], rotation: 0, footprint: [200, 120],
   },
 ];

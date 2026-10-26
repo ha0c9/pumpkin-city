@@ -1,7 +1,9 @@
 // 南瓜机场 — two vaulted glass terminals in a line along the island's long axis.
 // Each is two storeys: doors below, jet bridges off the upper floor, a lift at the west end.
 // A flared control tower stands on the open lawn beside each hall, clear of the doors.
-// Two airliners fly circuits: one is taking off while the other is on approach.
+// Airliners take off and fly straight until they fade into the horizon, then another
+// approaches from the horizon and lands. A typhoon finishes the leg in progress and
+// holds the field: a landing stays down, a departure does not return.
 import { registerBuilding } from '../core/Registry.js';
 import { textTexture } from '../core/Utils.js';
 import { curtainWallMaterial, sharedMaterial, colorMat, box, tiledBox, mesh } from './materials.js';
@@ -268,12 +270,14 @@ function terminal(ctx, g, cx, cz, title, mats, elevators) {
   return { D, floorY: FH + 0.2 };
 }
 
-function airliner(bodyColor, tailColor, beacon) {
+function airliner(bodyColor, tailColor, beacon, own = false) {
   const g = new THREE.Group();
-  const body = colorMat(bodyColor, { roughness: 0.32, metalness: 0.45 });
-  const tail = colorMat(tailColor, { roughness: 0.4, metalness: 0.25 });
-  const dark = sharedMaterial('darkSteel');
-  const glass = colorMat(0xb7d4e2, { roughness: 0.12, metalness: 0.55 });
+  const use = (m) => (own ? m.clone() : m);
+  const body = use(colorMat(bodyColor, { roughness: 0.32, metalness: 0.45 }));
+  const tail = use(colorMat(tailColor, { roughness: 0.4, metalness: 0.25 }));
+  const dark = use(sharedMaterial('darkSteel'));
+  const glass = use(colorMat(0xb7d4e2, { roughness: 0.12, metalness: 0.55 }));
+  const blink = use(beacon);
   const fuse = mesh(g, new THREE.CylinderGeometry(1.28, 1.28, 15.5, 14), body, -0.4, 2.55, 0);
   fuse.rotation.z = Math.PI / 2;
   mesh(g, new THREE.SphereGeometry(1.28, 14, 12), body, 7.2, 2.55, 0);
@@ -294,7 +298,9 @@ function airliner(bodyColor, tailColor, beacon) {
   }
   g.add(gear);
   g.userData.gear = gear;
-  mesh(g, new THREE.SphereGeometry(0.18, 8, 6), beacon, -6.6, 4.85, 0, { cast: false });
+  mesh(g, new THREE.SphereGeometry(0.18, 8, 6), blink, -6.6, 4.85, 0, { cast: false });
+  if (own) g.userData.fadeMaterials = [body, tail, dark, glass, blink];
+  g.userData.beaconMat = blink;
   return g;
 }
 
@@ -307,24 +313,35 @@ function lerpAngle(a, b, t) {
 
 const ease = (t) => t * t * (3 - 2 * t);
 
-/** Closed circuit: roll, rotate, climb, turn, descend, land. yaw 0 noses east. */
-function circuitKeys(runwayZ, outerZ) {
-  const y0 = 1.7;
+const GROUND_Y = 1.7;
+
+/** Eastbound takeoff: roll, rotate, climb straight, fade out at the horizon. */
+function departKeys(z) {
   return [
-    { s: 0, x: -132, y: y0, z: runwayZ, yaw: 0, pitch: 0, bank: 0 },
-    { s: 0.18, x: 90, y: y0, z: runwayZ, yaw: 0, pitch: 0.08, bank: 0 },
-    { s: 0.26, x: 168, y: 10, z: runwayZ, yaw: 0, pitch: 0.42, bank: 0 },
-    { s: 0.36, x: 230, y: 30, z: runwayZ + (outerZ - runwayZ) * 0.35, yaw: -0.9, pitch: 0.12, bank: -0.45 },
-    { s: 0.48, x: 150, y: 36, z: outerZ, yaw: -Math.PI, pitch: 0, bank: 0.1 },
-    { s: 0.64, x: -170, y: 30, z: outerZ, yaw: -Math.PI, pitch: -0.08, bank: 0 },
-    { s: 0.76, x: -230, y: 14, z: runwayZ + (outerZ - runwayZ) * 0.4, yaw: -Math.PI * 2 + 0.7, pitch: 0.05, bank: 0.4 },
-    { s: 0.86, x: -180, y: 5.5, z: runwayZ, yaw: -Math.PI * 2, pitch: 0.22, bank: 0 },
-    { s: 0.93, x: -132, y: y0, z: runwayZ, yaw: -Math.PI * 2, pitch: 0.12, bank: 0 },
-    { s: 1, x: -100, y: y0, z: runwayZ, yaw: -Math.PI * 2, pitch: 0, bank: 0 },
+    { s: 0, x: -132, y: GROUND_Y, z, yaw: 0, pitch: 0, bank: 0, fade: 1 },
+    { s: 0.24, x: 70, y: GROUND_Y, z, yaw: 0, pitch: 0.05, bank: 0, fade: 1 },
+    { s: 0.34, x: 150, y: 12, z, yaw: 0, pitch: 0.4, bank: 0, fade: 1 },
+    { s: 0.48, x: 420, y: 55, z, yaw: 0, pitch: 0.18, bank: 0, fade: 1 },
+    { s: 0.66, x: 1400, y: 140, z, yaw: 0, pitch: 0.06, bank: 0, fade: 1 },
+    { s: 0.84, x: 3000, y: 230, z, yaw: 0, pitch: 0.02, bank: 0, fade: 0.4 },
+    { s: 1, x: 4800, y: 300, z, yaw: 0, pitch: 0, bank: 0, fade: 0 },
   ];
 }
 
-function sampleCircuit(keys, s) {
+/** Eastbound arrival from the western horizon, ending in the takeoff hold. */
+function arriveKeys(z) {
+  return [
+    { s: 0, x: -4800, y: 300, z, yaw: 0, pitch: -0.04, bank: 0, fade: 0 },
+    { s: 0.16, x: -3000, y: 220, z, yaw: 0, pitch: -0.06, bank: 0, fade: 1 },
+    { s: 0.46, x: -900, y: 80, z, yaw: 0, pitch: -0.08, bank: 0, fade: 1 },
+    { s: 0.72, x: -260, y: 18, z, yaw: 0, pitch: -0.02, bank: 0, fade: 1 },
+    { s: 0.86, x: -160, y: 3.4, z, yaw: 0, pitch: 0.16, bank: 0, fade: 1 },
+    { s: 0.94, x: -132, y: GROUND_Y, z, yaw: 0, pitch: 0.05, bank: 0, fade: 1 },
+    { s: 1, x: -132, y: GROUND_Y, z, yaw: 0, pitch: 0, bank: 0, fade: 1 },
+  ];
+}
+
+function samplePath(keys, s) {
   let i = 0;
   while (i < keys.length - 2 && keys[i + 1].s <= s) i += 1;
   const a = keys[i];
@@ -337,7 +354,29 @@ function sampleCircuit(keys, s) {
     yaw: lerpAngle(a.yaw, b.yaw, t),
     pitch: a.pitch + (b.pitch - a.pitch) * t,
     bank: a.bank + (b.bank - a.bank) * t,
+    fade: a.fade + (b.fade - a.fade) * t,
   };
+}
+
+function setFade(group, fade) {
+  const o = Math.max(0, Math.min(1, fade));
+  group.visible = o > 0.04;
+  for (const m of group.userData.fadeMaterials) {
+    m.opacity = o;
+    m.transparent = o < 0.98;
+    m.depthWrite = o > 0.85;
+  }
+}
+
+function applyFlight(group, keys, s) {
+  const p = samplePath(keys, s);
+  group.position.set(p.x, p.y, p.z);
+  group.rotation.y = p.yaw;
+  group.rotation.z = p.pitch;
+  group.rotation.x = p.bank;
+  group.userData.gear.visible = p.y < 6;
+  setFade(group, p.fade);
+  return p;
 }
 
 registerBuilding('airport', {
@@ -421,26 +460,68 @@ registerBuilding('airport', {
     controlTower(g, -138, -20, mats, beacon);
     controlTower(g, 136, -26, mats, beacon);
 
+    const DEPART_DUR = 20;
+    const ARRIVE_DUR = 22;
     const flights = [
-      { group: airliner(0xf7f8f4, 0x1d4c6e, beacon), keys: circuitKeys(-75, -158), phase: 0 },
-      { group: airliner(0xf7f8f4, 0xc4562a, beacon), keys: circuitKeys(73, 158), phase: 0.5 },
+      { group: airliner(0xf7f8f4, 0x1d4c6e, beacon, true), z: -75, mode: 'depart', age: 1.2 },
+      { group: airliner(0xf7f8f4, 0xc4562a, beacon, true), z: 73, mode: 'arrive', age: ARRIVE_DUR * 0.55 },
     ];
     for (const f of flights) {
+      f.departDur = DEPART_DUR;
+      f.arriveDur = ARRIVE_DUR;
+      f.gap = 4;
+      f.dwell = 6;
       f.group.userData.dynamic = true;
       f.group.rotation.order = 'YZX';
+      ctx.nightMaterials.push({ material: f.group.userData.beaconMat, intensity: 3.5, blink: true, always: true, base: 0.2 });
       g.add(f.group);
+      if (f.mode === 'depart') applyFlight(f.group, departKeys(f.z), f.age / f.departDur);
+      if (f.mode === 'arrive') applyFlight(f.group, arriveKeys(f.z), f.age / f.arriveDur);
     }
 
-    const period = 26;
+    // Shut while the typhoon is up; open again only once the storm has actually cleared.
+    let shut = false;
+    let prev = null;
+    const holdPose = (f) => applyFlight(f.group, arriveKeys(f.z), 1);
     g.userData.animate = (t) => {
+      const dt = prev == null ? 0.016 : Math.min(0.1, Math.max(0, t - prev));
+      prev = t;
+      const storm = ctx.uniforms.uStorm.value;
+      if (storm > 0.35) shut = true;
+      else if (storm < 0.08) shut = false;
+
       for (const f of flights) {
-        const s = ((t / period) + f.phase) % 1;
-        const p = sampleCircuit(f.keys, s);
-        f.group.position.set(p.x, p.y, p.z);
-        f.group.rotation.y = p.yaw;
-        f.group.rotation.z = p.pitch;
-        f.group.rotation.x = p.bank;
-        f.group.userData.gear.visible = p.y < 4.2;
+        f.age += dt;
+        const tag = f.group.userData;
+        if (f.mode === 'depart') {
+          const s = Math.min(1, f.age / f.departDur);
+          applyFlight(f.group, departKeys(f.z), s);
+          tag.flightMode = 'depart';
+          if (s >= 1) { f.mode = shut ? 'away' : 'gap'; f.age = 0; }
+        } else if (f.mode === 'gap') {
+          f.group.visible = false;
+          tag.flightMode = 'gap';
+          if (shut) { f.mode = 'away'; f.age = 0; }
+          else if (f.age >= f.gap) { f.mode = 'arrive'; f.age = 0; }
+        } else if (f.mode === 'arrive') {
+          const s = Math.min(1, f.age / f.arriveDur);
+          applyFlight(f.group, arriveKeys(f.z), s);
+          tag.flightMode = 'arrive';
+          if (s >= 1) { f.mode = shut ? 'parked' : 'dwell'; f.age = 0; holdPose(f); }
+        } else if (f.mode === 'dwell') {
+          holdPose(f);
+          tag.flightMode = 'dwell';
+          if (shut) { f.mode = 'parked'; f.age = 0; }
+          else if (f.age >= f.dwell) { f.mode = 'depart'; f.age = 0; }
+        } else if (f.mode === 'away') {
+          f.group.visible = false;
+          tag.flightMode = 'away';
+          if (!shut) { f.mode = 'arrive'; f.age = 0; }
+        } else if (f.mode === 'parked') {
+          holdPose(f);
+          tag.flightMode = 'parked';
+          if (!shut) { f.mode = 'depart'; f.age = 0; }
+        }
       }
       for (const e of elevators) {
         const u = (Math.sin(t * e.speed + e.phase) + 1) / 2;
@@ -455,7 +536,7 @@ registerBuilding('airport', {
     return {
       category: '机场 Airport',
       name: '南瓜机场', nameEn: 'Pumpkin Airport',
-      description: '两座航站楼沿岛的长边排开，圆弧玻璃顶、两层幕墙。下层是门，上层连廊桥，楼西端有电梯上下。塔台站在航站楼侧面的空地上。南北两侧各有一组跑道，飞机从跑道起飞、绕场后再降落。',
+      description: '两座航站楼沿岛的长边排开，圆弧玻璃顶、两层幕墙。下层是门，上层连廊桥，楼西端有电梯上下。塔台在侧面空地上。飞机沿跑道起飞后直飞到天边消失，再有飞机从天边进近降落。台风天停止进出：落地的不再起飞，飞走的不再回来，天气转好后恢复。',
       featured: true,
     };
   },
