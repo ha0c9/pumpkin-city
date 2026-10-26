@@ -1,9 +1,10 @@
-// 南瓜机场 — two terminals in a line along the island's long axis, a runway pair on each
-// side, jet bridges, aprons, and a control tower per terminal (flared cab, mast, crossbar).
+// 南瓜机场 — two vaulted glass terminals in a line along the island's long axis.
+// Each is two storeys: doors below, jet bridges off the upper floor, a lift at the west end.
+// A flared control tower stands on the open lawn beside each hall, clear of the doors.
 // Two airliners fly circuits: one is taking off while the other is on approach.
 import { registerBuilding } from '../core/Registry.js';
 import { textTexture } from '../core/Utils.js';
-import { windowWallMaterial, sharedMaterial, colorMat, box, tiledBox, mesh } from './materials.js';
+import { curtainWallMaterial, sharedMaterial, colorMat, box, tiledBox, mesh } from './materials.js';
 
 const THREE = window.THREE;
 
@@ -76,49 +77,168 @@ function controlTower(g, x, z, mats, beacon) {
   plate.material = signMat;
 }
 
-function jetBridge(g, x, zFace, dir, mats) {
-  const len = 12.5;
-  const y = 4.15;
-  const zc = zFace + dir * (len / 2 + 0.3);
-  box(g, 2.35, 0.14, len, x, y - 1.15, zc, mats.bridge);
-  box(g, 2.55, 0.16, len + 0.3, x, y + 1.2, zc, mats.frame);
+/** Upper-level jet bridge. Slopes down from the terminal floor to the aircraft door. */
+function jetBridge(g, x, zFace, dir, floorY, mats) {
+  const len = 15.4;
+  const drop = 1.05;
+  const slope = Math.atan2(drop, len);
+  const yaw = new THREE.Group();
+  yaw.position.set(x, floorY, zFace);
+  yaw.rotation.y = dir > 0 ? 0 : Math.PI;
+  const pitch = new THREE.Group();
+  pitch.rotation.x = slope;
+  yaw.add(pitch);
+  box(pitch, 2.4, 0.14, len, 0, 0.07, len / 2, mats.bridge);
+  box(pitch, 2.62, 0.12, len + 0.2, 0, 2.62, len / 2, mats.frame);
   for (const side of [-1, 1]) {
-    box(g, 0.08, 1.7, len - 0.3, x + side * 1.12, y, zc, mats.bridgeGlass);
+    box(pitch, 0.08, 2.25, len - 0.4, side * 1.16, 1.3, len / 2, mats.bridgeGlass);
   }
   for (let i = 0; i <= 5; i++) {
-    const z = zFace + dir * (0.4 + len * i / 5);
-    box(g, 2.5, 2.45, 0.1, x, y, z, mats.frame);
+    const z = 0.15 + (len - 0.3) * i / 5;
+    box(pitch, 2.58, 2.55, 0.1, 0, 1.32, z, mats.frame);
   }
-  const endZ = zFace + dir * (len + 0.5);
-  mesh(g, new THREE.CylinderGeometry(1.35, 1.35, 2.5, 10), mats.bridge, x, y, endZ);
-  box(g, 0.28, y - 0.2, 0.28, x, (y - 0.2) / 2, endZ, mats.frame);
-  box(g, 2.6, 0.2, 1.4, x, y + 0.2, zFace + dir * 0.5, mats.frame);
+  mesh(pitch, new THREE.CylinderGeometry(1.32, 1.32, 2.55, 12), mats.bridge, 0, 1.32, len + 0.35);
+  box(pitch, 0.18, 2.7, 0.16, -1.3, 1.32, 0.06, mats.frame);
+  box(pitch, 0.18, 2.7, 0.16, 1.3, 1.32, 0.06, mats.frame);
+  box(pitch, 2.8, 0.16, 0.16, 0, 2.68, 0.06, mats.frame);
+  g.add(yaw);
+  const reach = len + 0.35;
+  const endZ = zFace + dir * Math.cos(slope) * reach;
+  const endY = floorY - Math.sin(slope) * reach + 1.2;
+  box(g, 0.32, Math.max(0.6, endY), 0.32, x, endY / 2, endZ, mats.frame);
 }
 
-function terminal(ctx, g, x, z, w, d, title, mats) {
-  const floors = 3;
-  const floorH = 3.15;
-  const h = floors * floorH;
-  const north = windowWallMaterial(ctx, {
-    cols: 12, rows: floors, wall: 'concrete', frame: '#f7f4ee', glass: '#2c6484', seed: 21 + x, litRatio: 0.75,
+function archGeometry(R, length, beta, segments = 28) {
+  const geo = new THREE.CylinderGeometry(R, R, length, segments, 1, true, Math.PI / 2 - beta, beta * 2);
+  geo.rotateZ(Math.PI / 2);
+  return geo;
+}
+
+function gableGeometry(R, beta, centerY, springY) {
+  const shape = new THREE.Shape();
+  const steps = 20;
+  const half = R * Math.sin(beta);
+  shape.moveTo(half, springY);
+  for (let i = 0; i <= steps; i++) {
+    const theta = Math.PI / 2 + beta - (2 * beta) * (i / steps);
+    const y = centerY + R * Math.sin(theta);
+    shape.lineTo(-R * Math.cos(theta), y);
+  }
+  shape.closePath();
+  const geo = new THREE.ShapeGeometry(shape);
+  geo.rotateY(Math.PI / 2);
+  return geo;
+}
+
+function facade(g, w, h, x, y, z, rotY, mat) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+  m.position.set(x, y, z);
+  m.rotation.y = rotY;
+  m.receiveShadow = true;
+  g.add(m);
+  return m;
+}
+
+function groundDoor(g, x, z, rotY, w, mats) {
+  const door = new THREE.Group();
+  const h = 2.9;
+  box(door, w + 0.36, h + 0.24, 0.2, 0, h / 2 + 0.06, 0, mats.frame);
+  box(door, w * 0.46, h - 0.1, 0.08, -w * 0.24, h / 2 + 0.06, 0.1, mats.door);
+  box(door, w * 0.46, h - 0.1, 0.08, w * 0.24, h / 2 + 0.06, 0.1, mats.door);
+  box(door, w * 0.9, 0.08, 0.1, 0, 1.15, 0.16, mats.frame);
+  door.position.set(x, 0, z);
+  door.rotation.y = rotY;
+  g.add(door);
+}
+
+/** Twin cars in a glass shaft on the west end. One rises while the other descends. */
+function addElevators(g, xWest, z, FH, springY, mats, list) {
+  const depth = 3.4;
+  const width = 6.6;
+  const cx = xWest - depth / 2 - 0.15;
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      box(g, 0.22, springY + 0.3, 0.22, cx + sx * (depth / 2 - 0.08), (springY + 0.3) / 2, z + sz * (width / 2 - 0.08), mats.frame);
+    }
+  }
+  box(g, depth + 0.45, 0.2, width + 0.45, cx, springY + 0.12, z, mats.frame);
+  box(g, depth + 0.15, 0.12, width + 0.15, cx, FH, z, mats.accent);
+  const glassH = springY - 0.2;
+  facade(g, width - 0.3, glassH, cx - depth / 2, glassH / 2 + 0.05, z, -Math.PI / 2, mats.shaftGlass);
+  facade(g, depth - 0.3, glassH, cx, glassH / 2 + 0.05, z - width / 2, Math.PI, mats.shaftGlass);
+  facade(g, depth - 0.3, glassH, cx, glassH / 2 + 0.05, z + width / 2, 0, mats.shaftGlass);
+  const signTex = textTexture(['电梯'], {
+    width: 256, height: 128, bg: '#1d4c6e', color: '#f4f7f8',
+    font: 'bold 72px "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif',
   });
-  const south = windowWallMaterial(ctx, {
-    cols: 12, rows: floors, wall: 'concrete', frame: '#f7f4ee', glass: '#2c6484', seed: 22 + x, litRatio: 0.6,
+  const signMat = new THREE.MeshStandardMaterial({ map: signTex, roughness: 0.55 });
+  const plate = mesh(g, new THREE.PlaneGeometry(2.2, 1.1), signMat, cx - depth / 2 - 0.08, springY - 0.9, z, { cast: false });
+  plate.rotation.y = -Math.PI / 2;
+  const groundY = 1.48;
+  const upperY = FH + 1.5;
+  for (const [dz, phase] of [[-1.4, 0], [1.4, Math.PI]]) {
+    const car = new THREE.Group();
+    car.userData.dynamic = true;
+    box(car, 2.05, 2.35, 2.2, 0, 0, 0, mats.cabBody);
+    box(car, 2.05, 0.16, 2.2, 0, 1.18, 0, mats.accent);
+    box(car, 1.35, 1.7, 0.06, 0, -0.05, 1.08, mats.cabGlass);
+    box(car, 0.08, 2.35, 2.2, -1.02, 0, 0, mats.frame);
+    box(car, 0.08, 2.35, 2.2, 1.02, 0, 0, mats.frame);
+    car.position.set(cx, groundY, z + dz);
+    g.add(car);
+    list.push({ car, groundY, upperY, phase, speed: 0.62 });
+  }
+}
+
+/**
+ * Two-storey hall: glass curtain wall, ground-floor doors, upper floor opening onto
+ * the jet bridges, barrel-vault roof, and a lift shaft on the west end.
+ */
+function terminal(ctx, g, cx, cz, title, mats, elevators) {
+  const W = 60;
+  const D = 22;
+  const FH = 4.2;
+  const springY = FH * 2;
+  const rise = 4.8;
+  const R = (D * D / 4 + rise * rise) / (2 * rise);
+  const beta = Math.asin((D / 2) / R);
+  const centerY = springY - R * Math.cos(beta);
+  const wallH = FH - 0.28;
+  const groundCy = 0.2 + wallH / 2;
+  const upperCy = FH + 0.22 + wallH / 2;
+
+  box(g, W + 1.6, 0.28, D + 1.6, cx, 0.14, cz, mats.concrete);
+  box(g, W + 0.85, 0.32, D + 0.7, cx, FH, cz, mats.frame);
+
+  const longGlass = curtainWallMaterial(ctx, {
+    cols: 16, rows: 1, seed: 40 + cx, tint: [62, 118, 150], mullion: '#f2f6f8', litRatio: 0.6,
   });
-  const end = windowWallMaterial(ctx, {
-    cols: 4, rows: floors, wall: 'concrete', frame: '#f7f4ee', glass: '#2c6484', seed: 23 + x, litRatio: 0.5,
+  const shortGlass = curtainWallMaterial(ctx, {
+    cols: 6, rows: 1, seed: 47 + cx, tint: [62, 118, 150], mullion: '#f2f6f8', litRatio: 0.48,
   });
-  const shell = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), [end, end, mats.roof, mats.concrete, south, north]);
-  shell.position.set(x, h / 2 + 0.15, z);
-  shell.castShadow = shell.receiveShadow = true;
-  g.add(shell);
-  box(g, w + 1.2, 0.35, d + 1.2, x, h + 0.35, z, mats.roof);
-  box(g, w + 1.4, 0.28, 1.1, x, h + 0.55, z - d / 2, mats.accent);
-  box(g, w + 1.4, 0.28, 1.1, x, h + 0.55, z + d / 2, mats.accent);
-  // Landside doors on the east face.
-  box(g, 0.12, 2.6, 3.2, x + w / 2 + 0.04, 1.5, z, mats.frame);
-  box(g, 0.08, 2.3, 2.6, x + w / 2 + 0.12, 1.45, z, mats.cabGlass);
-  box(g, 6, 0.16, 3.4, x + w / 2 + 1.6, 3.15, z, mats.accent);
+  facade(g, W, wallH, cx, groundCy, cz - D / 2, Math.PI, longGlass);
+  facade(g, W, wallH, cx, upperCy, cz - D / 2, Math.PI, longGlass);
+  facade(g, W, wallH, cx, groundCy, cz + D / 2, 0, longGlass);
+  facade(g, W, wallH, cx, upperCy, cz + D / 2, 0, longGlass);
+  facade(g, D, wallH, cx + W / 2, groundCy, cz, Math.PI / 2, shortGlass);
+  facade(g, D, wallH, cx + W / 2, upperCy, cz, Math.PI / 2, shortGlass);
+  const shaftW = 6.6;
+  const sideW = (D - shaftW) / 2;
+  for (const sz of [-1, 1]) {
+    const zz = cz + sz * (shaftW / 2 + sideW / 2);
+    facade(g, sideW, wallH, cx - W / 2, groundCy, zz, -Math.PI / 2, shortGlass);
+    facade(g, sideW, wallH, cx - W / 2, upperCy, zz, -Math.PI / 2, shortGlass);
+  }
+
+  for (const dir of [-1, 1]) {
+    for (const dx of [-28, 2]) {
+      groundDoor(g, cx + dx, cz + dir * (D / 2 + 0.12), dir > 0 ? 0 : Math.PI, 2.7, mats);
+      box(g, 4.4, 0.12, 2.3, cx + dx, FH - 0.16, cz + dir * (D / 2 + 1.2), mats.accent);
+    }
+  }
+  groundDoor(g, cx + W / 2 + 0.12, cz, Math.PI / 2, 6.6, mats);
+  box(g, 3.8, 0.14, 8.4, cx + W / 2 + 2.0, FH - 0.12, cz, mats.accent);
+
   const signTex = textTexture([title, 'PUMPKIN AIRPORT'], {
     width: 1024, height: 280, bg: '#1d4c6e', color: '#f4f7f8',
     font: 'bold 108px "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif',
@@ -128,10 +248,24 @@ function terminal(ctx, g, x, z, w, d, title, mats) {
     map: signTex, emissive: 0xffffff, emissiveMap: signTex, emissiveIntensity: 0.25, roughness: 0.5,
   });
   ctx.nightMaterials.push({ material: signMat, intensity: 0.9, base: 0.25 });
-  const sign = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.2, 14), [signMat, mats.frame, mats.frame, mats.frame, mats.frame, mats.frame]);
-  sign.position.set(x + w / 2 + 0.2, h + 2.4, z);
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(0.26, 2.5, 12), [signMat, mats.frame, mats.frame, mats.frame, mats.frame, mats.frame]);
+  sign.position.set(cx + W / 2 + 0.18, upperCy, cz);
   sign.castShadow = true;
   g.add(sign);
+
+  mesh(g, archGeometry(R - 0.05, W - 0.6, beta), mats.vault, cx, centerY, cz);
+  for (let i = 0; i <= 8; i++) {
+    const x = cx - W / 2 + (W / 8) * i;
+    mesh(g, archGeometry(R + 0.28, 0.42, beta, 18), mats.rib, x, centerY, cz);
+  }
+  box(g, W + 1.1, 0.26, 0.5, cx, springY + 0.02, cz - D / 2, mats.frame);
+  box(g, W + 1.1, 0.26, 0.5, cx, springY + 0.02, cz + D / 2, mats.frame);
+  const gable = gableGeometry(R - 0.05, beta, centerY, springY);
+  mesh(g, gable, mats.vault, cx - W / 2 + 0.02, 0, cz, { cast: false });
+  mesh(g, gable, mats.vault, cx + W / 2 - 0.02, 0, cz, { cast: false });
+
+  addElevators(g, cx - W / 2, cz, FH, springY, mats, elevators);
+  return { D, floorY: FH + 0.2 };
 }
 
 function airliner(bodyColor, tailColor, beacon) {
@@ -221,13 +355,22 @@ registerBuilding('airport', {
     const cabGlass = new THREE.MeshStandardMaterial({
       color: 0x8ec3d6, roughness: 0.08, metalness: 0.65, transparent: true, opacity: 0.72,
     });
+    const vault = new THREE.MeshStandardMaterial({
+      color: 0xf4f7f8, roughness: 0.42, metalness: 0.12, side: THREE.DoubleSide,
+    });
+    const rib = colorMat(0xb9c6d1, { roughness: 0.4, metalness: 0.35 });
+    const shaftGlass = new THREE.MeshStandardMaterial({
+      color: 0xc5e4f2, roughness: 0.08, metalness: 0.4, transparent: true, opacity: 0.38, side: THREE.DoubleSide,
+    });
+    const door = colorMat(0x16384c, { roughness: 0.18, metalness: 0.45 });
+    const cabBody = colorMat(0xf4f1ea, { roughness: 0.45, metalness: 0.2 });
     const beacon = new THREE.MeshStandardMaterial({ color: 0x3a0000, emissive: 0xff2200, emissiveIntensity: 0.2 });
     ctx.nightMaterials.push({ material: beacon, intensity: 3.5, blink: true, always: true, base: 0.2 });
     const edgeLight = new THREE.MeshStandardMaterial({ color: 0xfff4d2, emissive: 0xffe7a8, emissiveIntensity: 0.15 });
     ctx.nightMaterials.push({ material: edgeLight, intensity: 1.4, base: 0.15 });
     const mats = {
       concrete, roof: colorMat(0xd9dde2, { roughness: 0.55, metalness: 0.2 }),
-      accent, frame, bridge, bridgeGlass, cabGlass, edgeLight,
+      accent, frame, bridge, bridgeGlass, cabGlass, edgeLight, vault, rib, shaftGlass, door, cabBody,
     };
 
     const [wx, wz] = spec.position;
@@ -258,23 +401,25 @@ registerBuilding('airport', {
       box(g, 14, 0.02, 0.35, -118, 0.15, (z0 + z1) / 2, paint);
     }
 
+    const elevators = [];
     const terminals = [
       { x: -46, title: '1号航站楼' },
       { x: 48, title: '2号航站楼' },
     ];
     for (const t of terminals) {
-      terminal(ctx, g, t.x, 0, 64, 24, t.title, mats);
+      const hall = terminal(ctx, g, t.x, 0, t.title, mats, elevators);
       for (const dir of [-1, 1]) {
         for (const gx of [-18, 16]) {
-          jetBridge(g, t.x + gx, dir * 12, dir, mats);
+          jetBridge(g, t.x + gx, dir * (hall.D / 2), dir, hall.floorY, mats);
           const parked = airliner(0xf4f7f8, t.x < 0 ? 0x1d4c6e : 0xe07a2f, beacon);
           parked.position.set(t.x + gx, 0, dir * 28.5);
           g.add(parked);
         }
       }
     }
-    controlTower(g, -84, -2, mats, beacon);
-    controlTower(g, 86, -2, mats, beacon);
+    // Towers sit on the open lawn beside each terminal, clear of doors, halls and the curb.
+    controlTower(g, -138, -20, mats, beacon);
+    controlTower(g, 136, -26, mats, beacon);
 
     const flights = [
       { group: airliner(0xf7f8f4, 0x1d4c6e, beacon), keys: circuitKeys(-75, -158), phase: 0 },
@@ -297,6 +442,10 @@ registerBuilding('airport', {
         f.group.rotation.x = p.bank;
         f.group.userData.gear.visible = p.y < 4.2;
       }
+      for (const e of elevators) {
+        const u = (Math.sin(t * e.speed + e.phase) + 1) / 2;
+        e.car.position.y = e.groundY + (e.upperY - e.groundY) * u;
+      }
     };
 
     g.userData.height = 16;
@@ -306,7 +455,7 @@ registerBuilding('airport', {
     return {
       category: '机场 Airport',
       name: '南瓜机场', nameEn: 'Pumpkin Airport',
-      description: '两座航站楼沿岛的长边排开，南北两侧各有一组跑道，飞机从跑道起飞、绕场后再降落。每座航站楼有廊桥、停机坪，和一座上宽下收的塔台。',
+      description: '两座航站楼沿岛的长边排开，圆弧玻璃顶、两层幕墙。下层是门，上层连廊桥，楼西端有电梯上下。塔台站在航站楼侧面的空地上。南北两侧各有一组跑道，飞机从跑道起飞、绕场后再降落。',
       featured: true,
     };
   },
