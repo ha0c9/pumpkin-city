@@ -52,8 +52,10 @@ export const ROADS = [
 
   // --- 南瓜中心岛 southwest exit, and the reserved airport island ---
   { id: 'airport-approach', name: '机场路', nameEn: 'Airport Rd', from: [-150, 130], to: [-150, 168], lanes: 2 },
-  { id: 'airport-rd', name: '机场路', nameEn: 'Airport Rd', from: [-500, 430], to: [-500, 680], lanes: 2 },
-  { id: 'airport-cross', name: '翔云路', nameEn: 'Xiangyun Rd', from: [-620, 560], to: [-370, 560], lanes: 2 },
+  { id: 'airport-rd', name: '机场路', nameEn: 'Airport Rd', from: [-500, 430], to: [-500, 472], lanes: 2 },
+  { id: 'airport-yingbin', name: '迎宾路', nameEn: 'Yingbin Rd', from: [-500, 472], to: [-290, 472], lanes: 2 },
+  { id: 'airport-terminal', name: '航站楼路', nameEn: 'Terminal Rd', from: [-290, 472], to: [-290, 620], lanes: 2 },
+  { id: 'airport-curb', name: '航站楼路', nameEn: 'Terminal Rd', from: [-290, 575], to: [-392, 575], lanes: 2 },
 ];
 
 /**
@@ -171,6 +173,12 @@ export const LANDMARKS = [
     name: '明珠马术训练场', nameEn: 'Pearl Equestrian Centre',
     description: '东方明珠岛南侧的马术训练场。一栋马棚、一间两层办公室，旁边是两个椭圆形训练场：一场走盛装舞步，一场摆着障碍和踩杆，场里有小马在绕圈训练。',
     position: [638, -502], rotation: 0, footprint: [74, 52],
+  },
+  {
+    type: 'airport', id: 'pumpkin-airport',
+    name: '南瓜机场', nameEn: 'Pumpkin Airport',
+    description: '两座航站楼沿岛的长边排开，南北两侧各有一组跑道。每座航站楼配一座塔台、廊桥和停机坪，跑道上有飞机起飞和降落。',
+    position: [-500, 575], rotation: 0, footprint: [200, 120],
   },
 ];
 
