@@ -380,8 +380,8 @@ export class Traffic {
     } else {
       this._edgePoint(car.edge, car.s, car.off, p);
       if (car.edge.bridge) {
-        const q = this._edgePoint(car.edge, Math.min(car.edge.len, car.s + 1), car.off, new THREE.Vector3());
-        const q0 = this._edgePoint(car.edge, Math.max(0, car.s - 1), car.off, new THREE.Vector3());
+        const q = this._edgePoint(car.edge, Math.min(car.edge.len, car.s + 1), car.off, this._q || (this._q = new THREE.Vector3()));
+        const q0 = this._edgePoint(car.edge, Math.max(0, car.s - 1), car.off, this._q0 || (this._q0 = new THREE.Vector3()));
         d.subVectors(q, q0).normalize();
       } else d.copy(car.edge.dir);
     }

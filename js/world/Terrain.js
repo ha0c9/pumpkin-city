@@ -138,13 +138,65 @@ export class Terrain {
     }
     geo.computeBoundingSphere();
 
+    // One mesh per island. The combined grid's bounds cover the whole archipelago, so a single
+    // mesh was redrawn in the main view, the reflection and the refraction whenever any island
+    // was on screen. Splitting does not move a vertex: each triangle keeps the normal and color
+    // it had on the combined mesh, and islands do not share edges.
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.93, metalness: 0 });
     this._patchMaterial(mat);
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.receiveShadow = true;
-    mesh.name = 'terrain';
-    mesh.userData.isTerrain = true;
-    return mesh;
+    const group = new THREE.Group();
+    group.name = 'terrain';
+    group.matrixAutoUpdate = false;
+    const norArr = geo.attributes.normal.array;
+    const buckets = new Map();
+    for (let t = 0; t < index.length; t += 3) {
+      const ia = index[t], ib = index[t + 1], ic = index[t + 2];
+      const x = (pos[ia * 3] + pos[ib * 3] + pos[ic * 3]) / 3;
+      const z = (pos[ia * 3 + 2] + pos[ib * 3 + 2] + pos[ic * 3 + 2]) / 3;
+      let isl = this.field.islandAt(x, z, 240);
+      if (!isl) {
+        let bestD = Infinity;
+        for (const cand of this.field.islands) {
+          const d = (cand.x - x) * (cand.x - x) + (cand.z - z) * (cand.z - z);
+          if (d < bestD) { bestD = d; isl = cand; }
+        }
+      }
+      const id = isl.id;
+      let list = buckets.get(id);
+      if (!list) buckets.set(id, list = []);
+      list.push(ia, ib, ic);
+    }
+    for (const [id, tris] of buckets) {
+      const remap = new Map();
+      const npos = [], ncol = [], nnor = [], nidx = [];
+      const add = (vi) => {
+        let k = remap.get(vi);
+        if (k === undefined) {
+          k = npos.length / 3;
+          remap.set(vi, k);
+          npos.push(pos[vi * 3], pos[vi * 3 + 1], pos[vi * 3 + 2]);
+          ncol.push(colors[vi * 3], colors[vi * 3 + 1], colors[vi * 3 + 2]);
+          nnor.push(norArr[vi * 3], norArr[vi * 3 + 1], norArr[vi * 3 + 2]);
+        }
+        return k;
+      };
+      for (let i = 0; i < tris.length; i++) nidx.push(add(tris[i]));
+      const part = new THREE.BufferGeometry();
+      part.setAttribute('position', new THREE.Float32BufferAttribute(npos, 3));
+      part.setAttribute('color', new THREE.Float32BufferAttribute(ncol, 3));
+      part.setAttribute('normal', new THREE.Float32BufferAttribute(nnor, 3));
+      part.setIndex(nidx.length > 65535 ? new THREE.Uint32BufferAttribute(nidx, 1) : new THREE.Uint16BufferAttribute(nidx, 1));
+      part.computeBoundingSphere();
+      const mesh = new THREE.Mesh(part, mat);
+      mesh.receiveShadow = true;
+      mesh.castShadow = false;
+      mesh.matrixAutoUpdate = false;
+      mesh.name = `terrain-${id}`;
+      mesh.userData.isTerrain = true;
+      group.add(mesh);
+    }
+    geo.dispose();
+    return group;
   }
 
   /** Coarse open-sea floor that sits slightly below the detailed mesh. */

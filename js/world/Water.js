@@ -114,7 +114,8 @@ uniform sampler2D uSimTex;
 uniform sampler2D uDepthTex;
 uniform sampler2D uReflTex;
 uniform sampler2D uRefrTex;
-uniform sampler2D uWaveTex;
+uniform sampler2D uWaveTexA; // RG chop slope, BA d(slope)/dt, both 8-bit encoded
+uniform sampler2D uWaveTexB; // RG ripple slope
 uniform mat4 uReflMatrix;
 uniform vec2 uResolution;
 uniform float uTerrainSize;
@@ -129,6 +130,7 @@ uniform float uWaveSlope;
 uniform float uWind;
 uniform vec2 uWaveTiles;   // meters covered by the chop (RG) and ripple (BA) tiles
 uniform vec2 uWaveDecode;  // texel [-1, 1] -> slope, per tile
+uniform float uWaveAge;    // (time since chop bake) * maxOmega; 0 on a fresh bake so the sample is exact
 uniform vec2 uWaveVar;     // mean squared slope of each tile
 uniform float uMicroRough; // unresolved capillary roughness (mean squared slope)
 uniform float uSpecular;
@@ -159,6 +161,14 @@ float unresolved(float footprint, float lmin, float lmax) {
   return clamp(log(6.0 * footprint / lmin) / log(lmax / lmin), 0.0, 1.0);
 }
 
+// Chop slopes can be a few milliseconds past the last bake. uWaveAge is 0 on a fresh bake, and the
+// BA derivative is scaled so this add is the first-order Taylor term in the same 8-bit units as RG.
+vec2 chopSample(vec2 uv) {
+  vec4 t = texture2D(uWaveTexA, uv);
+  return t.rg * 2.0 - 1.0 + (t.ba * 2.0 - 1.0) * uWaveAge;
+}
+vec2 ripSample(vec2 uv) { return texture2D(uWaveTexB, uv).rg * 2.0 - 1.0; }
+
 // Detail slopes from the animated spectrum texture. Each tile is read twice (second copy rotated and
 // offset, gradient rotated back) to hide tiling. Bands that shrink below a few pixels fade out and
 // their slope variance is returned in lostVar so the sun highlight can widen instead of aliasing.
@@ -167,10 +177,10 @@ vec2 detailSlope(vec2 p, float footprint, out float lostVar) {
   const mat2 R2 = mat2(-0.38, 0.92, -0.92, -0.38);
   float lostA = unresolved(footprint, uWaveTiles.x / 30.0, uWaveTiles.x / 3.0);
   float lostB = unresolved(footprint, uWaveTiles.y / 30.0, uWaveTiles.y / 3.0);
-  vec2 a = texture2D(uWaveTex, p / uWaveTiles.x).rg * 2.0 - 1.0;
-  a += (texture2D(uWaveTex, (R1 * p) / (uWaveTiles.x * 0.79) + vec2(0.37, 0.61)).rg * 2.0 - 1.0) * R1;
-  vec2 b = texture2D(uWaveTex, (R2 * p) / uWaveTiles.y).ba * 2.0 - 1.0;
-  b += (texture2D(uWaveTex, (R1 * R2 * p) / (uWaveTiles.y * 0.73) + vec2(0.71, 0.13)).ba * 2.0 - 1.0) * (R1 * R2);
+  vec2 a = chopSample(p / uWaveTiles.x);
+  a += chopSample((R1 * p) / (uWaveTiles.x * 0.79) + vec2(0.37, 0.61)) * R1;
+  vec2 b = ripSample((R2 * p) / uWaveTiles.y);
+  b += ripSample((R1 * R2 * p) / (uWaveTiles.y * 0.73) + vec2(0.71, 0.13)) * (R1 * R2);
   float keepA = 1.0 - smoothstep(0.35, 0.95, lostA);
   float keepB = 1.0 - smoothstep(0.35, 0.95, lostB);
   lostVar = uWaveVar.x * mix(lostA, 1.0, 1.0 - keepA) + uWaveVar.y * mix(lostB, 1.0, 1.0 - keepB);
@@ -350,7 +360,7 @@ export class Water {
     this.uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
       uSimTex: { value: null }, uDepthTex: { value: terrain.depthTexture },
       uReflTex: { value: this.reflRT.texture }, uRefrTex: { value: this.refrRT.texture },
-      uWaveTex: { value: null },
+      uWaveTexA: { value: null }, uWaveTexB: { value: null }, uWaveAge: { value: 0 },
       uReflMatrix: { value: this.reflMatrix }, uResolution: { value: new THREE.Vector2(1, 1) },
       uTerrainSize: { value: TERRAIN.size }, uMaxDepth: { value: WATER.maxDepth },
       uShallow: { value: new THREE.Vector3(...WATER.shallowColor) },
@@ -368,7 +378,8 @@ export class Water {
       size: QUALITY.waveTexSize, count: WAVES.count, tileA: WAVES.tileA, tileB: WAVES.tileB,
       varA: WAVES.slopeVarA, varB: WAVES.slopeVarB, wind: WAVES.windAngle,
     });
-    this.uniforms.uWaveTex.value = this.spectrum.texture;
+    this.uniforms.uWaveTexA.value = this.spectrum.rtA.texture;
+    this.uniforms.uWaveTexB.value = this.spectrum.rtB.texture;
     this.uniforms.uWaveDecode.value.set(1 / this.spectrum.enc.x, 1 / this.spectrum.enc.y);
     // UniformsUtils.merge clones textures; render-target textures must be the original objects.
     this.uniforms.uReflTex.value = this.reflRT.texture;
@@ -404,6 +415,9 @@ export class Water {
     this.clipAbove = [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0.05)];
     this.clipBelow = [new THREE.Plane(new THREE.Vector3(0, -1, 0), 0.8)];
     this._tmp = { v: new THREE.Vector3(), t: new THREE.Vector3(), up: new THREE.Vector3(), color: new THREE.Color() };
+    const deep = WATER.deepColor;
+    this._refrClear = new THREE.Color(deep[0], deep[1], deep[2]).multiplyScalar(0.6);
+    this._passStamp = null;
   }
 
   /**
@@ -452,8 +466,15 @@ export class Water {
   }
 
   update(dt) {
-    this.spectrum.update(this.ctx.uniforms.uTime.value);
-    this.sim.step(1);
+    const perf = this.ctx.perf;
+    const time = this.ctx.uniforms.uTime.value;
+    let t0 = perf && performance.now();
+    this.spectrum.update(time);
+    this.uniforms.uWaveAge.value = this.spectrum.age;
+    if (perf) perf.add('spectrum', performance.now() - t0, this.spectrum.lastInfo.calls, this.spectrum.lastInfo.tris);
+    t0 = perf && performance.now();
+    const passes = this.sim.step(1);
+    if (perf) perf.add('sim', performance.now() - t0, passes, 0);
     this.uniforms.uSimTex.value = this.sim.texture;
     this.ctx.uniforms.uSimTex.value = this.sim.texture;
     this.uniforms.uExposure.value = this.ctx.renderer.toneMappingExposure;
@@ -462,8 +483,53 @@ export class Water {
     this.uniforms.uWind.value = 1 + rain * 0.35 + this.ctx.uniforms.uStorm.value * 1.3;
   }
 
+  /**
+   * The mirror only has to be redrawn when the viewpoint, sun or weather actually moved.
+   * One held frame at most, so a still camera never freezes traffic in the reflection,
+   * and any camera motion draws it again immediately.
+   */
+  _reusePasses(camera) {
+    const s = this._passStamp;
+    if (!s || s.hold <= 0) return false;
+    if (performance.now() - s.now > 45) return false;
+    const u = this.ctx.uniforms;
+    if (Math.abs(u.uRain.value - s.rain) > 0.004) return false;
+    if (Math.abs(u.uStorm.value - s.storm) > 0.004) return false;
+    if (Math.abs(u.uDaylight.value - s.day) > 0.004) return false;
+    if (Math.abs(this.ctx.renderer.toneMappingExposure - s.exposure) > 0.02) return false;
+    if (u.uSunDir.value.distanceToSquared(s.sun) > 1e-8) return false;
+    if (camera.position.distanceToSquared(s.pos) > 4e-4) return false;
+    if (camera.quaternion.dot(s.quat) < 0.999999) return false;
+    if (camera.aspect !== s.aspect || camera.fov !== s.fov) return false;
+    s.hold = 0;
+    return true;
+  }
+
+  _markPasses(camera) {
+    const u = this.ctx.uniforms;
+    const s = this._passStamp || (this._passStamp = {
+      sun: new THREE.Vector3(), pos: new THREE.Vector3(), quat: new THREE.Quaternion(),
+    });
+    s.hold = 1;
+    s.now = performance.now();
+    s.rain = u.uRain.value;
+    s.storm = u.uStorm.value;
+    s.day = u.uDaylight.value;
+    s.exposure = this.ctx.renderer.toneMappingExposure;
+    s.sun.copy(u.uSunDir.value);
+    s.pos.copy(camera.position);
+    s.quat.copy(camera.quaternion);
+    s.aspect = camera.aspect;
+    s.fov = camera.fov;
+  }
+
   /** Render reflection and refraction textures. Call before the main render. */
   renderPasses(scene, camera, skyMesh) {
+    const perf = this.ctx.perf;
+    if (this._reusePasses(camera)) {
+      if (perf) { perf.add('refl', 0, 0, 0); perf.add('refr', 0, 0, 0); }
+      return;
+    }
     const r = this.ctx.renderer;
     const { v, t, up, color } = this._tmp;
     const prevClip = r.clippingPlanes;
@@ -494,18 +560,21 @@ export class Water {
     r.clippingPlanes = this.clipAbove;
     r.setRenderTarget(this.reflRT);
     r.clear();
+    let tPass = perf && performance.now();
     r.render(scene, mc);
+    if (perf) perf.add('refl', performance.now() - tPass, r.info.render.calls, r.info.render.triangles);
 
     // Refraction: only what lies below (or barely above) the surface.
     if (skyMesh) skyMesh.visible = false;
     const prevLayers = camera.layers.mask;
     camera.layers.set(0);
     r.clippingPlanes = this.clipBelow;
-    const deep = WATER.deepColor;
-    r.setClearColor(new THREE.Color(deep[0], deep[1], deep[2]).multiplyScalar(0.6), 1);
+    r.setClearColor(this._refrClear, 1);
     r.setRenderTarget(this.refrRT);
     r.clear();
+    tPass = perf && performance.now();
     r.render(scene, camera);
+    if (perf) perf.add('refr', performance.now() - tPass, r.info.render.calls, r.info.render.triangles);
     camera.layers.mask = prevLayers;
     if (skyMesh) { skyMesh.visible = true; skyMesh.position.copy(camera.position); }
 
@@ -513,5 +582,6 @@ export class Water {
     r.setRenderTarget(prevTarget);
     r.setClearColor(color, prevAlpha);
     this.mesh.visible = true;
+    this._markPasses(camera);
   }
 }

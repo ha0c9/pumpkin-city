@@ -423,12 +423,32 @@ export class Animals {
     this.list.push(a);
   }
 
-  update(dt, t) {
+  update(dt, t, camera, follow) {
+    const cam = camera && camera.position;
+    const far2 = 240 * 240;
     for (const a of this.list) {
       const o = a.obj;
-      if (a.type === 'dolphin') { this._updateDolphin(a, dt, t); continue; }
+      // Far animals keep integrating, just not on every display frame. Near ones, and whatever
+      // the camera is following, stay at full rate so motion and splashes don't hitch.
+      let step = dt;
+      if (cam && o !== follow) {
+        const dx = o.position.x - cam.x, dy = o.position.y - cam.y, dz = o.position.z - cam.z;
+        if (dx * dx + dy * dy + dz * dz > far2) {
+          a._acc = (a._acc || 0) + dt;
+          a._skip = (a._skip || 0) + 1;
+          if (a._skip < 3) continue;
+          step = a._acc;
+          a._acc = 0;
+          a._skip = 0;
+        } else if (a._acc) {
+          step = dt + a._acc;
+          a._acc = 0;
+          a._skip = 0;
+        }
+      }
+      if (a.type === 'dolphin') { this._updateDolphin(a, step, t); continue; }
       if (a.type === 'gull') {
-        a.angle += a.dir * dt * a.speed / a.radius;
+        a.angle += a.dir * step * a.speed / a.radius;
         const x = a.center.x + Math.cos(a.angle) * a.radius;
         const z = a.center.z + Math.sin(a.angle) * a.radius;
         const y = a.alt + Math.sin(t * 0.4 + a.phase) * 3;
@@ -440,9 +460,9 @@ export class Animals {
         continue;
       }
       if (a.state === 'pause') {
-        a.timer -= dt;
-        if (a.type === 'deer') o.userData.parts.neck.rotation.x = THREE.MathUtils.lerp(o.userData.parts.neck.rotation.x, 1.2, dt * 2);
-        if (a.type === 'peacock') a.display = Math.min(1, a.display + dt * 0.8);
+        a.timer -= step;
+        if (a.type === 'deer') o.userData.parts.neck.rotation.x = THREE.MathUtils.lerp(o.userData.parts.neck.rotation.x, 1.2, step * 2);
+        if (a.type === 'peacock') a.display = Math.min(1, a.display + step * 0.8);
         if (a.timer <= 0) {
           a.state = 'move';
           a.target = SWIMMERS.has(a.type) ? this._waterPoint(a.island, o.position)
@@ -455,27 +475,27 @@ export class Animals {
           a.state = 'pause';
           a.timer = 2 + this.rng() * (a.type === 'deer' ? 7 : a.type === 'peacock' ? 9 : 3);
         } else {
-          let step = a.speed * dt;
-          if (a.type === 'rabbit' || a.type === 'squirrel') step *= Math.max(0, Math.sin((t + a.phase) * (a.type === 'squirrel' ? 10 : 7)));
-          if (a.type === 'peacock') { a.display = Math.max(0, a.display - dt * 1.5); if (a.display > 0.05) step = 0; }
-          o.position.x += dx / d * Math.min(step, d);
-          o.position.z += dz / d * Math.min(step, d);
+          let move = a.speed * step;
+          if (a.type === 'rabbit' || a.type === 'squirrel') move *= Math.max(0, Math.sin((t + a.phase) * (a.type === 'squirrel' ? 10 : 7)));
+          if (a.type === 'peacock') { a.display = Math.max(0, a.display - step * 1.5); if (a.display > 0.05) move = 0; }
+          o.position.x += dx / d * Math.min(move, d);
+          o.position.z += dz / d * Math.min(move, d);
           // Crabs walk sideways.
           const yaw = Math.atan2(dx, dz) + (a.type === 'crab' ? Math.PI / 2 : 0);
           let diff = yaw - o.rotation.y;
           diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-          o.rotation.y += diff * Math.min(1, dt * 3);
+          o.rotation.y += diff * Math.min(1, step * 3);
           if (a.type === 'deer') {
             const ph = (t + a.phase) * 6;
             o.userData.parts.legs.forEach((leg, i) => { leg.rotation.x = Math.sin(ph + (i % 2 ? Math.PI : 0) + (i > 1 ? Math.PI / 2 : 0)) * 0.45; });
-            o.userData.parts.neck.rotation.x = THREE.MathUtils.lerp(o.userData.parts.neck.rotation.x, 0, dt * 2);
+            o.userData.parts.neck.rotation.x = THREE.MathUtils.lerp(o.userData.parts.neck.rotation.x, 0, step * 2);
           }
         }
       }
-      this._animate(a, dt, t);
+      this._animate(a, step, t);
       if (SWIMMERS.has(a.type)) {
         o.position.y = Math.sin(t * 2 + a.phase) * 0.03 + (a.type === 'turtle' ? -0.08 : -0.02);
-        a.timer2 = (a.timer2 || 0) - dt;
+        a.timer2 = (a.timer2 || 0) - step;
         if (a.timer2 <= 0 && a.state === 'move' && this.water) {
           this.water.addDrop(o.position.x, o.position.z, a.type === 'duck' ? 0.9 : 1.3, 0.025);
           a.timer2 = 0.35;

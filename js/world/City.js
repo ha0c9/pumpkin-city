@@ -74,6 +74,7 @@ export class City {
     }
     for (const lot of pools.large) this.place(fromLot('pocketPark', lot), rng);
     for (const lot of pools.small) this.place({ ...fromLot('cornerGarden', lot), footprint: null }, rng);
+    this._batchStatic();
   }
 
   /** Create a building from a spec ({ type, position: [x, z], rotation, size?, ... }) and add it to the world. */
@@ -122,5 +123,62 @@ export class City {
     this.group.add(obj);
     this.buildings.push({ spec, object: obj, info });
     return obj;
+  }
+
+  /**
+   * Merge static opaque meshes that already share a material into one mesh per island.
+   * Originals stay in the building (hidden) so raycasts still hit the individual mesh.
+   * Dynamic subtrees, transparent glass, instancing and vertex-colored meshes are left alone,
+   * and animated parts are already marked `userData.dynamic`.
+   */
+  _batchStatic() {
+    this.group.updateMatrixWorld(true);
+    const islandOf = (x, z) => {
+      let best = this.terrain.islands[0], bestD = Infinity;
+      for (const isl of this.terrain.islands) {
+        const d = (isl.x - x) * (isl.x - x) + (isl.z - z) * (isl.z - z);
+        if (d < bestD) { bestD = d; best = isl; }
+      }
+      return best.id;
+    };
+    const groups = new Map();
+    const visit = (o) => {
+      if (o.userData.dynamic) return;
+      for (const c of o.children) visit(c);
+      if (!o.isMesh || o.isInstancedMesh || !o.visible || o.children.length) return;
+      const mat = o.material;
+      if (!mat || Array.isArray(mat) || mat.transparent || mat.vertexColors) return;
+      if (!o.geometry || !o.geometry.attributes || !o.geometry.attributes.position) return;
+      const e = o.matrixWorld.elements;
+      const key = `${islandOf(e[12], e[14])}|${mat.uuid}|${o.castShadow ? 1 : 0}|${o.receiveShadow ? 1 : 0}`;
+      let g = groups.get(key);
+      if (!g) groups.set(key, g = { material: mat, cast: o.castShadow, receive: o.receiveShadow, items: [] });
+      g.items.push(o);
+    };
+    for (const b of this.buildings) visit(b.object);
+    const batch = new THREE.Group();
+    batch.name = 'static-batch';
+    batch.matrixAutoUpdate = false;
+    let meshes = 0, sources = 0;
+    for (const g of groups.values()) {
+      if (g.items.length < 2) continue;
+      const geos = g.items.map((o) => {
+        const geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+        geo.applyMatrix4(o.matrixWorld);
+        return geo;
+      });
+      const merged = new THREE.Mesh(mergeSimple(geos), g.material);
+      merged.castShadow = g.cast;
+      merged.receiveShadow = g.receive;
+      merged.matrixAutoUpdate = false;
+      merged.frustumCulled = true;
+      batch.add(merged);
+      for (const o of g.items) o.visible = false;
+      geos.forEach((geo) => geo.dispose());
+      meshes++;
+      sources += g.items.length;
+    }
+    if (meshes) this.group.add(batch);
+    this.batchInfo = { meshes, sources };
   }
 }

@@ -22,6 +22,41 @@ import { Animals } from '../nature/Animals.js';
 const THREE = window.THREE;
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
+function createPerf() {
+  const el = document.createElement('div');
+  el.id = 'perf';
+  el.style.cssText = 'position:fixed;left:8px;top:8px;z-index:40;padding:6px 8px;background:rgba(0,0,0,.55);color:#d8ffe8;font:12px/1.4 ui-monospace,monospace;pointer-events:none;white-space:pre';
+  document.body.appendChild(el);
+  const sum = {};
+  let frames = 0;
+  let windowStart = performance.now();
+  return {
+    add(key, ms, calls = 0, tris = 0) {
+      const s = sum[key] || (sum[key] = { ms: 0, calls: 0, tris: 0 });
+      s.ms += ms;
+      s.calls += calls;
+      s.tris += tris;
+    },
+    tick() {
+      frames++;
+      const now = performance.now();
+      if (now - windowStart < 500) return;
+      const n = frames;
+      const fps = n * 1000 / (now - windowStart);
+      const line = (key) => {
+        const s = sum[key];
+        if (!s) return `${key} —`;
+        const text = `${key.padEnd(8)} ${(s.ms / n).toFixed(2)}ms  ${Math.round(s.calls / n)} calls  ${Math.round(s.tris / n / 1000)}k tri`;
+        s.ms = 0; s.calls = 0; s.tris = 0;
+        return text;
+      };
+      el.textContent = [`${fps.toFixed(1)} fps`, line('spectrum'), line('sim'), line('refl'), line('refr'), line('main')].join('\n');
+      frames = 0;
+      windowStart = now;
+    },
+  };
+}
+
 export class App {
   constructor(container, ui) {
     this.container = container;
@@ -51,6 +86,7 @@ export class App {
       renderer, scene, camera,
       mask: new OccupancyMask(),
       pickables: [], nightMaterials: [], wetMaterials: [], animators: [],
+      perf: new URLSearchParams(location.search).get('perf') === '1' ? createPerf() : null,
       uniforms: {
         uTime: { value: 0 }, uRain: { value: 0 }, uStorm: { value: 0 }, uDaylight: { value: 1 }, uSunset: { value: 0 }, uNight: { value: 0 },
         uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uMoonDir: { value: new THREE.Vector3(0, -1, 0) },
@@ -188,7 +224,7 @@ export class App {
     this.env.feedRain(this.water, focus);
     this.traffic.update(dt, this.time);
     this.grass.update(ctx.camera);
-    this.animals.update(dt, this.time);
+    this.animals.update(dt, this.time, ctx.camera, this.interaction.followTarget);
     const night = u.uNight.value;
     this.furniture.update(this.time, night, focus);
     for (const n of ctx.nightMaterials) {
@@ -204,8 +240,16 @@ export class App {
     this.water.renderPasses(ctx.scene, ctx.camera, this.sky.mesh);
     this.sky.follow(ctx.camera);
     // Shadows are rendered in the main pass only: global clip planes from the water passes would cut the shadow map.
+    // The map still updates every frame. Cars, animals, flags and aircraft move inside the frustum, and a
+    // skipped map shears those shadows. Island chunks keep that pass from redrawing the whole archipelago.
+    const perf = ctx.perf;
+    const tMain = perf && performance.now();
     ctx.renderer.shadowMap.needsUpdate = true;
     ctx.renderer.render(ctx.scene, ctx.camera);
+    if (perf) {
+      perf.add('main', performance.now() - tMain, ctx.renderer.info.render.calls, ctx.renderer.info.render.triangles);
+      perf.tick();
+    }
     this.interaction.update(this.time);
   }
 

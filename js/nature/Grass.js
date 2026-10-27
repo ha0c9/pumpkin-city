@@ -127,7 +127,7 @@ export class Grass {
 
   update(camera) {
     const c = this.uniforms.uCenter.value;
-    const dir = new THREE.Vector3();
+    const dir = this._dir || (this._dir = new THREE.Vector3());
     camera.getWorldDirection(dir);
     dir.y = 0;
     if (dir.lengthSq() > 0) dir.normalize();

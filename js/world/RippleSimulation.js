@@ -95,6 +95,7 @@ export class RippleSimulation {
     this.res = resolution;
     this.bounds = bounds; // THREE.Vector4(minX, minZ, sizeX, sizeZ)
     this.queue = [];
+    this.energy = 0;
     this.supported = this._checkSupport();
 
     const type = this.supported === 'float' ? THREE.FloatType : THREE.HalfFloatType;
@@ -176,6 +177,7 @@ export class RippleSimulation {
     if (u < 0 || u > 1 || v < 0 || v > 1) return;
     if (this.queue.length > 256) return;
     this.queue.push([u, v, radius / this.bounds.z, strength]);
+    this.energy += Math.abs(strength);
   }
 
   _pass(material) {
@@ -187,28 +189,37 @@ export class RippleSimulation {
   }
 
   step(iterations = 1) {
-    if (!this.supported) return;
+    if (!this.supported) return 0;
+    // A flat field stays flat. Damping here is slower than the shader (0.993 * 0.9995, plus the
+    // border fade) so the skip never starts while height is still visible.
+    if (!this.pendingShift && !this.queue.length && this.energy < 2e-4) return 0;
     const r = this.renderer;
     const prevTarget = r.getRenderTarget();
     const prevAutoClear = r.autoClear;
     const prevXr = r.xr.enabled;
     r.xr.enabled = false;
     r.autoClear = false;
+    let passes = 0;
     if (this.pendingShift) {
       this.shiftMat.uniforms.uOffset.value.set(this.pendingShift[0], this.pendingShift[1]);
       this._pass(this.shiftMat);
       this.pendingShift = null;
+      passes++;
     }
     while (this.queue.length) {
       const batch = this.queue.splice(0, MAX_DROPS);
       batch.forEach((d, i) => this.dropMat.uniforms.uDrops.value[i].set(d[0], d[1], d[2], d[3]));
       this.dropMat.uniforms.uCount.value = batch.length;
       this._pass(this.dropMat);
+      passes++;
     }
-    for (let i = 0; i < iterations; i++) this._pass(this.updateMat);
+    for (let i = 0; i < iterations; i++) { this._pass(this.updateMat); passes++; }
     this._pass(this.normalMat);
+    passes++;
+    this.energy *= Math.pow(0.996, iterations);
     r.setRenderTarget(prevTarget);
     r.autoClear = prevAutoClear;
     r.xr.enabled = prevXr;
+    return passes;
   }
 }

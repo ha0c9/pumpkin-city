@@ -257,6 +257,7 @@ export const TREE_INFO = {
 export class Trees {
   constructor(ctx, terrain, groundMap, mask, fixedSpots) {
     this.ctx = ctx;
+    this.islands = terrain.islands;
     const atlas = foliageAtlas();
     const rng = mulberry32(2026);
     const placements = { broadleaf: [], pine: [], palm: [], bush: [], rock: [] };
@@ -334,24 +335,72 @@ export class Trees {
 
   _instanced(type, geo, mat, list, rng, castShadow) {
     if (!list.length) return;
-    const mesh = new THREE.InstancedMesh(geo, mat, list.length);
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
-    const color = new THREE.Color();
-    list.forEach((p, i) => {
-      q.setFromEuler(e.set(type === 'rock' ? rng() : 0, rng() * Math.PI * 2, type === 'rock' ? rng() * 0.5 : 0));
+    // Draw the instances in the same random order as before, then split into spatial chunks.
+    // InstancedMesh defaults to frustumCulled = false, so one mesh of every tree was transformed
+    // in the main view, both water passes and the shadow map. A chunk carries a tight sphere
+    // (plus a margin for wind sway) and is culled as a whole; the trees that remain draw with
+    // the same matrices, colors and geometry.
+    geo.computeBoundingSphere();
+    const base = geo.boundingSphere;
+    const reachOf = (scale) => (base.radius + base.center.length()) * scale + 12;
+    const records = list.map((p) => {
+      const rot = new THREE.Euler(type === 'rock' ? rng() : 0, rng() * Math.PI * 2, type === 'rock' ? rng() * 0.5 : 0);
       const sy = type === 'rock' ? p.s * (0.6 + rng() * 0.6) : p.s * (0.9 + rng() * 0.25);
-      m.compose(new THREE.Vector3(p.x, p.y, p.z), q, new THREE.Vector3(p.s, sy, p.s));
-      mesh.setMatrixAt(i, m);
       const v = 0.85 + rng() * 0.3;
-      color.setRGB(v * (0.95 + rng() * 0.1), v, v * (0.9 + rng() * 0.1));
-      mesh.setColorAt(i, color);
+      return {
+        p, rot, sy,
+        color: new THREE.Color(v * (0.95 + rng() * 0.1), v, v * (0.9 + rng() * 0.1)),
+        reach: reachOf(Math.max(p.s, sy)),
+      };
     });
-    mesh.castShadow = castShadow;
-    mesh.receiveShadow = true;
-    mesh.name = `trees-${type}`;
-    mesh.userData.pick = { ...TREE_INFO[type], id: `veg-${type}` };
-    this.ctx.scene.add(mesh);
-    this.ctx.pickables.push(mesh);
-    this.meshes.push(mesh);
+    // One mesh per island. Far islands drop out of the view and the shadow map; an island
+    // that is on screen draws the same instances as the old single mesh.
+    const buckets = new Map();
+    for (const rec of records) {
+      let key = 'off';
+      let best = Infinity;
+      const { x, z } = rec.p;
+      for (const isl of this.islands) {
+        const d = (isl.x - x) * (isl.x - x) + (isl.z - z) * (isl.z - z);
+        if (d < best) { best = d; key = isl.id; }
+      }
+      const arr = buckets.get(key);
+      if (arr) arr.push(rec);
+      else buckets.set(key, [rec]);
+    }
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion();
+    const info = { ...TREE_INFO[type], id: `veg-${type}` };
+    for (const [key, items] of buckets) {
+      // Own geometry shell so each chunk can carry its own bounding sphere while sharing vertex data.
+      const g = new THREE.BufferGeometry();
+      for (const name of Object.keys(geo.attributes)) g.setAttribute(name, geo.getAttribute(name));
+      if (geo.index) g.setIndex(geo.index);
+      const mesh = new THREE.InstancedMesh(g, mat, items.length);
+      mesh.frustumCulled = true;
+      let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+      items.forEach((rec, i) => {
+        const p = rec.p;
+        q.setFromEuler(rec.rot);
+        m.compose(new THREE.Vector3(p.x, p.y, p.z), q, new THREE.Vector3(p.s, rec.sy, p.s));
+        mesh.setMatrixAt(i, m);
+        mesh.setColorAt(i, rec.color);
+        const rad = rec.reach;
+        minX = Math.min(minX, p.x - rad); maxX = Math.max(maxX, p.x + rad);
+        minY = Math.min(minY, p.y - rad); maxY = Math.max(maxY, p.y + rad);
+        minZ = Math.min(minZ, p.z - rad); maxZ = Math.max(maxZ, p.z + rad);
+      });
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = (minZ + maxZ) / 2;
+      const r = 0.5 * Math.hypot(maxX - minX, maxY - minY, maxZ - minZ);
+      g.boundingSphere = new THREE.Sphere(new THREE.Vector3(cx, cy, cz), r);
+      mesh.castShadow = castShadow;
+      mesh.receiveShadow = true;
+      mesh.matrixAutoUpdate = false;
+      mesh.name = `trees-${type}-${key}`;
+      mesh.userData.pick = info;
+      this.ctx.scene.add(mesh);
+      this.ctx.pickables.push(mesh);
+      this.meshes.push(mesh);
+    }
   }
 }

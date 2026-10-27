@@ -70,6 +70,12 @@ export class Environment {
     scene.fog = new THREE.FogExp2(0xbfd5ea, 0.0007);
     this._buildRain();
     this._envTimer = 0;
+    this._c = {
+      warm: new THREE.Color(), skyDay: new THREE.Color(), skyNight: new THREE.Color(0x1a2850),
+      amb: new THREE.Color(), fogDay: new THREE.Color(), fogSunset: new THREE.Color(),
+      fogNight: new THREE.Color(), fog: new THREE.Color(), mix: new THREE.Color(),
+    };
+    this._origin = new THREE.Vector3();
     this.apply(0, true);
   }
 
@@ -155,7 +161,7 @@ export class Environment {
     // Sun / moon light.
     const sunUp = sunDir.y > -0.02;
     const lightDir = sunUp ? sunDir : u.uMoonDir.value;
-    const warm = new THREE.Color().setRGB(1.0, lerp(0.55, 0.96, smoothstep(0.0, 0.4, sunDir.y)), lerp(0.3, 0.9, smoothstep(0.0, 0.45, sunDir.y)));
+    const warm = this._c.warm.setRGB(1.0, lerp(0.55, 0.96, smoothstep(0.0, 0.4, sunDir.y)), lerp(0.3, 0.9, smoothstep(0.0, 0.45, sunDir.y)));
     if (sunUp) {
       this.sun.color.copy(warm);
       this.sun.intensity = 2.8 * smoothstep(-0.02, 0.12, sunDir.y) * (1 - rain * 0.78) * (1 - storm * 0.6);
@@ -164,29 +170,32 @@ export class Environment {
       this.sun.intensity = 0.32 * smoothstep(-0.02, 0.2, u.uMoonDir.value.y) * (1 - rain * 0.7);
     }
     u.uSunColor.value.set(this.sun.color.r, this.sun.color.g, this.sun.color.b).multiplyScalar(Math.max(this.sun.intensity, 0) * 0.55);
-    const center = focus || new THREE.Vector3();
+    const center = focus || this._origin;
     this.sun.position.copy(center).addScaledVector(lightDir, 300);
     this.sun.target.position.copy(center);
     this.sun.target.updateMatrixWorld();
 
     // Ambient.
-    const skyDay = new THREE.Color().setRGB(...SKY.dayHorizon);
-    const skyNight = new THREE.Color(0x1a2850);
+    const skyDay = this._c.skyDay.setRGB(...SKY.dayHorizon);
+    const skyNight = this._c.skyNight;
     this.hemi.color.copy(skyNight).lerp(skyDay, daylight);
     this.hemi.groundColor.setRGB(0.25, 0.27, 0.18).multiplyScalar(0.25 + 0.75 * daylight);
     this.hemi.intensity = lerp(0.3, 0.42, daylight) * (1 - rain * 0.1) * (1 - storm * 0.3) + this.flash * 1.6;
-    const amb = this.hemi.color.clone().multiplyScalar(this.hemi.intensity * 0.6);
+    const amb = this._c.amb.copy(this.hemi.color).multiplyScalar(this.hemi.intensity * 0.6);
     u.uAmbient.value.set(amb.r, amb.g, amb.b);
     u.uWaterTint.value.set(...WATER.midColor).multiplyScalar(1.4).addScalar(0.25);
 
-    // Fog matches the horizon.
-    const fogDay = new THREE.Color().setRGB(...SKY.dayHorizon);
-    const fogSunset = new THREE.Color().setRGB(...SKY.sunsetHorizon).lerp(fogDay, 0.45);
-    const fogNight = new THREE.Color().setRGB(...SKY.nightHorizon);
-    const fog = fogNight.clone().lerp(fogDay.lerp(fogSunset, sunset * 0.6), daylight);
-    fog.lerp(new THREE.Color(0.5, 0.53, 0.57).multiplyScalar(0.2 + 0.8 * daylight), rain * 0.8);
-    fog.lerp(new THREE.Color(0.24, 0.27, 0.3).multiplyScalar(0.2 + 0.8 * daylight), storm * 0.7);
-    fog.lerp(new THREE.Color(0.75, 0.8, 0.9), this.flash * 0.5);
+    // Fog matches the horizon. Same mutation order as the previous per-frame Color construction:
+    // sunset is mixed into a copy of the day horizon, then that result is mixed by daylight.
+    const fogDay = this._c.fogDay.setRGB(...SKY.dayHorizon);
+    const fogSunset = this._c.fogSunset.setRGB(...SKY.sunsetHorizon).lerp(fogDay, 0.45);
+    const fogNight = this._c.fogNight.setRGB(...SKY.nightHorizon);
+    fogDay.lerp(fogSunset, sunset * 0.6);
+    const fog = this._c.fog.copy(fogNight).lerp(fogDay, daylight);
+    const mix = this._c.mix;
+    fog.lerp(mix.setRGB(0.5, 0.53, 0.57).multiplyScalar(0.2 + 0.8 * daylight), rain * 0.8);
+    fog.lerp(mix.setRGB(0.24, 0.27, 0.3).multiplyScalar(0.2 + 0.8 * daylight), storm * 0.7);
+    fog.lerp(mix.setRGB(0.75, 0.8, 0.9), this.flash * 0.5);
     this.ctx.scene.fog.color.copy(fog);
     this.sky.uniforms.uFogColor.value.copy(fog);
     this.ctx.scene.fog.density = lerp(lerp(0.00055, 0.0032, rain), 0.0034, storm);
