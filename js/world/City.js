@@ -26,7 +26,7 @@ function shuffle(arr, rng) {
  * Merge a building's static, single-material, opaque meshes into one mesh per material (fewer draw calls).
  * Objects flagged `userData.dynamic` (and their subtrees) are left untouched so they can still animate.
  */
-function mergeStatic(root) {
+function mergeStatic(root, scene) {
   root.updateMatrixWorld(true);
   const groups = new Map();
   const visit = (o) => {
@@ -38,6 +38,7 @@ function mergeStatic(root) {
     groups.get(key).items.push(o);
   };
   visit(root);
+  const detached = [];
   for (const grp of groups.values()) {
     if (grp.items.length < 2) continue;
     const geos = grp.items.map((o) => {
@@ -47,9 +48,28 @@ function mergeStatic(root) {
     });
     const merged = new THREE.Mesh(mergeSimple(geos), grp.material);
     merged.castShadow = grp.cast; merged.receiveShadow = grp.receive;
-    for (const o of grp.items) o.parent.remove(o);
+    for (const o of grp.items) {
+      o.parent.remove(o);
+      detached.push(o);
+    }
     geos.forEach((g) => g.dispose());
     root.add(merged);
+  }
+  if (!detached.length) return;
+  // Source geometries are not uploaded yet (merge runs before the first frame) but their
+  // typed arrays sit in the JS heap until GC. Drop the ones nothing live still references.
+  const live = new Set();
+  const mark = (o) => { if (o.geometry) live.add(o.geometry); };
+  root.traverse(mark);
+  if (scene) scene.traverse(mark);
+  const freed = new Set();
+  for (const o of detached) {
+    const g = o.geometry;
+    if (g && !live.has(g) && !freed.has(g)) {
+      g.dispose();
+      freed.add(g);
+    }
+    o.geometry = null;
   }
 }
 
@@ -80,7 +100,7 @@ export class City {
   place(spec, rng = Math.random) {
     const def = getBuildingType(spec.type);
     const obj = def.create(this.ctx, spec, rng);
-    mergeStatic(obj);
+    mergeStatic(obj, this.ctx.scene);
     const [x, z] = spec.position;
     const y = this.terrain.heightAt(x, z);
     const rot = spec.rotation || 0;

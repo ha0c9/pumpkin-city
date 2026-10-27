@@ -80,7 +80,14 @@ export class Grass {
           uniform sampler2D uGround; uniform float uGroundRes; uniform float uTerrainSize;
           uniform float uTime; uniform float uRain; uniform float uStorm;
           vec2 groundTexel(vec2 ij) {
-            return texture2D(uGround, (ij + 0.5) / uGroundRes).rg;
+            // Matches GroundMap: height is a 16-bit unorm over [-32, 96], grass is 0 / 0.5 / 1.
+            vec4 t = texture2D(uGround, (ij + 0.5) / uGroundRes);
+            float hi = floor(t.r * 255.0 + 0.5);
+            float lo = floor(t.g * 255.0 + 0.5);
+            float h = (hi * 256.0 + lo) / 65535.0 * 128.0 - 32.0;
+            float g8 = floor(t.b * 255.0 + 0.5);
+            float grass = g8 > 200.0 ? 1.0 : (g8 > 64.0 ? 0.5 : 0.0);
+            return vec2(h, grass);
           }
           vec2 groundSample(vec2 wp) {
             vec2 p = (wp / uTerrainSize + 0.5) * uGroundRes - 0.5;

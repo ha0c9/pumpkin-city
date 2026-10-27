@@ -5,6 +5,7 @@ import { CameraControls } from './CameraControls.js';
 import { Interaction } from './Interaction.js';
 import { GamepadInput } from './Gamepad.js';
 import { lerp, clamp } from './Utils.js';
+import { collectTextures, disposeAppGpu, estimateGpu, releaseTextureCpu } from './gpuMemory.js';
 import { Terrain } from '../world/Terrain.js';
 import { Water, LAYER_DETAIL } from '../world/Water.js';
 import { Sky } from '../world/Sky.js';
@@ -41,7 +42,24 @@ export class App {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.shadowMap.autoUpdate = false;
     this.container.appendChild(renderer.domElement);
-    renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); ui.showContextLost(); });
+    this._lostCount = 0;
+    // Safari drops the context when the tab is backgrounded or the GPU budget is exceeded.
+    // Releasing our handles lets the process free whatever it still owns. A restored context is
+    // not reused in place: the page reloads once, so init cannot allocate a second copy on top
+    // of the old scene. Under extreme pressure iOS may still kill the tab before restore runs.
+    renderer.domElement.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      this._lostCount++;
+      if (this._contextDead) return;
+      this._contextDead = true;
+      ui.showContextLost();
+      try { disposeAppGpu(this); } catch (_) { /* context already gone */ }
+    });
+    renderer.domElement.addEventListener('webglcontextrestored', () => {
+      if (this._reloading) return;
+      this._reloading = true;
+      location.reload();
+    });
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 7000);
@@ -109,6 +127,8 @@ export class App {
     window.addEventListener('resize', () => this._resize());
     this.clock = new THREE.Clock();
     this.time = 0;
+    this.estimateGpu = () => estimateGpu(this);
+    this._setupPerf();
     this._frame();
     ui.bind(this);
     this.gamepad = new GamepadInput({ controls: this.controls, interaction: this.interaction, env: this.env, ui, places: this.places });
@@ -167,7 +187,20 @@ export class App {
     this.water.setSize(w, h, renderer.getPixelRatio());
   }
 
+  _setupPerf() {
+    if (new URLSearchParams(location.search).get('perf') !== '1') return;
+    this._perf = true;
+    const el = document.createElement('div');
+    el.id = 'perf';
+    el.style.cssText = 'position:fixed;top:8px;left:8px;z-index:80;font:12px/1.45 ui-monospace,Menlo,monospace;color:#e8f6ff;background:rgba(6,16,28,.78);padding:8px 10px;border-radius:8px;pointer-events:none;white-space:pre';
+    document.body.appendChild(el);
+    this._perfEl = el;
+    this._fpsN = 0;
+    this._fpsT = performance.now();
+  }
+
   _frame() {
+    if (this._contextDead) return;
     requestAnimationFrame(() => this._frame());
     const dt = Math.min(this.clock.getDelta(), 0.1);
     this.time += dt;
@@ -207,6 +240,22 @@ export class App {
     ctx.renderer.shadowMap.needsUpdate = true;
     ctx.renderer.render(ctx.scene, ctx.camera);
     this.interaction.update(this.time);
+    // Canvases and data-texture arrays stay in the JS heap after WebGL has copied them.
+    // On iOS that CPU copy counts toward the same limit that kills the WebGL context.
+    this._cpuSweep = (this._cpuSweep || 0) + 1;
+    if (this._cpuSweep < 180 || this._cpuSweep % 60 === 0) releaseTextureCpu(collectTextures(this), ctx.renderer);
+    if (this._perf) this._updatePerf();
+  }
+
+  _updatePerf() {
+    this._fpsN++;
+    const now = performance.now();
+    if (now - this._fpsT < 500) return;
+    const fps = this._fpsN * 1000 / (now - this._fpsT);
+    this._fpsN = 0;
+    this._fpsT = now;
+    const g = estimateGpu(this);
+    this._perfEl.textContent = `fps ${fps.toFixed(1)}   context lost ${this._lostCount}\n${g.text}`;
   }
 
   _updateShadowFrustum() {
