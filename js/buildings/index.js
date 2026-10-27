@@ -21,5 +21,6 @@ import './SchoolAheadSign.js';
 import './EquestrianCenter.js';
 import './ConstructionSite.js';
 import './Factory.js';
+import './Airport.js';
 import './Park.js';
 import './GltfModel.js';
