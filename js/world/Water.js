@@ -423,10 +423,18 @@ export class Water {
     add(S, band, 0, s / 2 + band / 2);
     add(band, s, -(s / 2 + band / 2), 0);
     add(band, s, s / 2 + band / 2, 0);
-    const arrays = parts.map((p) => p.toNonIndexed().attributes.position.array);
-    const positions = new Float32Array(arrays.reduce((n, a) => n + a.length, 0));
+    const chunks = [];
+    let total = 0;
+    for (const p of parts) {
+      const ni = p.toNonIndexed();
+      chunks.push(ni.attributes.position.array);
+      total += ni.attributes.position.array.length;
+      ni.dispose();
+      if (ni !== p) p.dispose();
+    }
+    const positions = new Float32Array(total);
     let offset = 0;
-    for (const a of arrays) { positions.set(a, offset); offset += a.length; }
+    for (const a of chunks) { positions.set(a, offset); offset += a.length; }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     return geo;

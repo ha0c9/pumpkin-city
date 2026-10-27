@@ -43,16 +43,30 @@ export function curtainWallMaterial(ctx, { cols, rows, seed = 1, tint = [40, 70,
   for (let i = 0; i <= cols; i++) { c.fillRect(i * cw - 1.5, 0, 3, h); r.fillRect(i * cw - 1.5, 0, 3, h); }
   for (let j = 0; j <= rows; j++) { c.fillRect(0, j * chh - 1, w, 2); r.fillRect(0, j * chh - 1, w, 2); }
 
+  // Roughness lives in the color map's alpha (linear; sRGB conversion ignores alpha).
+  // That removes a third full-size texture per facade. Alpha is forced back to 1 in the shader
+  // so the glass stays opaque. Values match the old roughness map's green channel.
+  const pixels = c.getImageData(0, 0, w, h);
+  const rp = r.getImageData(0, 0, w, h).data;
+  const pd = pixels.data;
+  for (let i = 0, n = w * h; i < n; i++) pd[i * 4 + 3] = rp[i * 4 + 1];
+  c.putImageData(pixels, 0, 0);
+  rough.width = 1; rough.height = 1;
+
   const map = canvasTexture(color, { anisotropy: 8 });
   const emissiveMap = canvasTexture(emis, { anisotropy: 8 });
-  const roughnessMap = canvasTexture(rough, { srgb: false, anisotropy: 8 });
-  for (const t of [map, emissiveMap, roughnessMap]) {
+  for (const t of [map, emissiveMap]) {
     t.wrapS = THREE.RepeatWrapping; t.repeat.set(repeatX, 1);
   }
   const mat = new THREE.MeshStandardMaterial({
-    map, roughnessMap, roughness: 1, metalness: 0.9,
+    map, roughness: 1, metalness: 0.9,
     emissiveMap, emissive: 0xffffff, emissiveIntensity: 0, envMapIntensity: 1.25,
   });
+  mat.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <map_fragment>', '#include <map_fragment>\n\tdiffuseColor.a = opacity;')
+      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = texture2D( map, vUv ).a;');
+  };
   ctx.nightMaterials.push({ material: mat, intensity: 1.15 });
   return mat;
 }

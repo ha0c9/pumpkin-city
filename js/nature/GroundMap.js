@@ -36,15 +36,26 @@ export class GroundMap {
         else if (this.height[k] < 1.6) this.grass[k] = 0.5;
       }
     }
-    const data = new Float32Array(n * 4);
+    // GPU copy is RGBA8, not RGBA32F. r128 cannot size an RG16F upload (it leaves the
+    // unsized RG internal format, and the texture comes back empty). Height is packed as
+    // a 16-bit unorm over [-32, 96] in R,G (step ≈ 2 mm). Grass is the three mask levels
+    // in B (0, 128, 255). The grass shader unpacks both. CPU queries keep the float arrays;
+    // this upload buffer is released after the first frame.
+    const data = new Uint8Array(n * 4);
     for (let k = 0; k < n; k++) {
-      data[k * 4] = this.height[k];
-      data[k * 4 + 1] = this.grass[k];
-      data[k * 4 + 3] = 1;
+      let u = Math.round((this.height[k] + 32) / 128 * 65535);
+      if (u < 0) u = 0;
+      else if (u > 65535) u = 65535;
+      const g = this.grass[k];
+      data[k * 4] = u >> 8;
+      data[k * 4 + 1] = u & 255;
+      data[k * 4 + 2] = g >= 0.75 ? 255 : g >= 0.25 ? 128 : 0;
+      data[k * 4 + 3] = 255;
     }
-    this.texture = new THREE.DataTexture(data, res, res, THREE.RGBAFormat, THREE.FloatType);
+    this.texture = new THREE.DataTexture(data, res, res, THREE.RGBAFormat, THREE.UnsignedByteType);
     this.texture.minFilter = THREE.NearestFilter;
     this.texture.magFilter = THREE.NearestFilter;
+    this.texture.generateMipmaps = false;
     this.texture.needsUpdate = true;
   }
 

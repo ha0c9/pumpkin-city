@@ -96,15 +96,19 @@ export class RippleSimulation {
     this.bounds = bounds; // THREE.Vector4(minX, minZ, sizeX, sizeZ)
     this.queue = [];
     this.supported = this._checkSupport();
-
-    const type = this.supported === 'float' ? THREE.FloatType : THREE.HalfFloatType;
-    const opts = {
-      type, format: THREE.RGBAFormat, depthBuffer: false, stencilBuffer: false,
-      minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
-      wrapS: THREE.ClampToEdgeWrapping, wrapT: THREE.ClampToEdgeWrapping,
-    };
-    this.rtA = new THREE.WebGLRenderTarget(resolution, resolution, opts);
-    this.rtB = new THREE.WebGLRenderTarget(resolution, resolution, opts);
+    this.energy = 0;
+    this._idle = 0;
+    this.rtA = null;
+    this.rtB = null;
+    // Bound while the simulation is cold so the water shader always has a sampler.
+    // A zero field is what a fully damped simulation looks like, so waking it does not pop.
+    // Alpha must be 0. A flat simulation stores normal.xz in B,A as 0,0 — an opaque
+    // byte texture would sample A as 1 and tilt every wave normal in the patch.
+    this.zero = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1, THREE.RGBAFormat);
+    this.zero.needsUpdate = true;
+    this.zero.magFilter = THREE.NearestFilter;
+    this.zero.minFilter = THREE.NearestFilter;
+    this.zero.generateMipmaps = false;
 
     const delta = new THREE.Vector2(1 / resolution, 1 / resolution);
     this.dropMat = this._mat(DROP_FS, {
@@ -127,14 +131,38 @@ export class RippleSimulation {
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.dropMat);
     this.quad.frustumCulled = false;
     this.scene.add(this.quad);
+  }
 
+  /** Allocate the ping-pong targets on the first splash. Half-float when the device can render it. */
+  _ensure() {
+    if (this.rtA || !this.supported) return;
+    const type = this.supported === 'float' ? THREE.FloatType : THREE.HalfFloatType;
+    const opts = {
+      type, format: THREE.RGBAFormat, depthBuffer: false, stencilBuffer: false,
+      minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+      wrapS: THREE.ClampToEdgeWrapping, wrapT: THREE.ClampToEdgeWrapping,
+    };
+    this.rtA = new THREE.WebGLRenderTarget(this.res, this.res, opts);
+    this.rtB = new THREE.WebGLRenderTarget(this.res, this.res, opts);
+    const r = this.renderer;
     const prevColor = new THREE.Color();
-    renderer.getClearColor(prevColor);
-    const prevAlpha = renderer.getClearAlpha();
-    renderer.setClearColor(0x000000, 0);
-    for (const rt of [this.rtA, this.rtB]) { renderer.setRenderTarget(rt); renderer.clear(); }
-    renderer.setRenderTarget(null);
-    renderer.setClearColor(prevColor, prevAlpha);
+    r.getClearColor(prevColor);
+    const prevAlpha = r.getClearAlpha();
+    const prev = r.getRenderTarget();
+    r.setClearColor(0x000000, 0);
+    for (const rt of [this.rtA, this.rtB]) { r.setRenderTarget(rt); r.clear(); }
+    r.setRenderTarget(prev);
+    r.setClearColor(prevColor, prevAlpha);
+  }
+
+  /** Free both targets once the field has gone flat. The next drop allocates them again. */
+  release() {
+    if (this.rtA) { this.rtA.dispose(); this.rtA = null; }
+    if (this.rtB) { this.rtB.dispose(); this.rtB = null; }
+    this.queue.length = 0;
+    this.pendingShift = null;
+    this.energy = 0;
+    this._idle = 0;
   }
 
   _checkSupport() {
@@ -150,7 +178,7 @@ export class RippleSimulation {
     return new THREE.ShaderMaterial({ vertexShader: QUAD_VS, fragmentShader: fs, uniforms, depthTest: false, depthWrite: false });
   }
 
-  get texture() { return this.rtA.texture; }
+  get texture() { return this.rtA ? this.rtA.texture : this.zero; }
 
   /**
    * Keep the simulated window centered near (x, z). Moves in whole-texel steps once the focus
@@ -165,16 +193,21 @@ export class RippleSimulation {
     if (Math.abs(x - cx) < texel * 4 && Math.abs(z - cz) < texel * 4) return false;
     const dx = Math.round((x - cx) / texel) * texel, dz = Math.round((z - cz) / texel) * texel;
     b.x += dx; b.y += dz;
-    this.pendingShift = [dx / b.z, dz / b.w];
+    // A cold field is already zero, so sliding the window does not need a shift pass.
+    if (this.rtA) this.pendingShift = [dx / b.z, dz / b.w];
     return true;
   }
 
   /** Queue a drop at world (x, z). radius in meters, strength in meters of displacement. */
   addDrop(x, z, radius = 2, strength = 0.4) {
+    if (!this.supported) return;
     const u = (x - this.bounds.x) / this.bounds.z;
     const v = (z - this.bounds.y) / this.bounds.w;
     if (u < 0 || u > 1 || v < 0 || v > 1) return;
     if (this.queue.length > 256) return;
+    this._ensure();
+    this.energy += Math.abs(strength);
+    this._idle = 0;
     this.queue.push([u, v, radius / this.bounds.z, strength]);
   }
 
@@ -187,7 +220,14 @@ export class RippleSimulation {
   }
 
   step(iterations = 1) {
-    if (!this.supported) return;
+    if (!this.supported || !this.rtA) return;
+    // Rain off and the height field gone: keep the 1×1 zero texture instead of two full targets.
+    if (!this.pendingShift && !this.queue.length && this.energy < 2e-4) {
+      this._idle++;
+      if (this._idle > 45) this.release();
+      return;
+    }
+    this._idle = 0;
     const r = this.renderer;
     const prevTarget = r.getRenderTarget();
     const prevAutoClear = r.autoClear;
@@ -207,6 +247,9 @@ export class RippleSimulation {
     }
     for (let i = 0; i < iterations; i++) this._pass(this.updateMat);
     this._pass(this.normalMat);
+    // Decay slower than the shader (0.993 damping plus the 0.9995 height fade) so we never
+    // drop the targets while a ripple is still visible.
+    this.energy *= 0.996 ** iterations;
     r.setRenderTarget(prevTarget);
     r.autoClear = prevAutoClear;
     r.xr.enabled = prevXr;
