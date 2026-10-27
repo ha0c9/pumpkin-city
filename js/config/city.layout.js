@@ -115,6 +115,12 @@ export const LANDMARKS = [
     position: [-67.9, 58.05], rotation: 0,
   },
   {
+    type: 'policeStation', id: 'zootopia-police',
+    name: '祖托皮亚警察局', nameEn: 'Zootopia Police Station',
+    description: '武夷路南侧的圆厅警察局：暖色石砌墙、竖向壁柱、草地屋顶和玻璃网格穹顶，门楣上写着 Zootopia Police Station。门口台阶通向广场。原先的灰色轿车改成了这里的巡逻警车。',
+    position: [112, 100], rotation: PI,
+  },
+  {
     type: 'homeInn', id: 'home-inn',
     name: '如家酒店', nameEn: 'Home Inn',
     description: '简约舒适的经济型连锁酒店，明黄色立面与蓝色招牌，共 6 层 120 间客房。',

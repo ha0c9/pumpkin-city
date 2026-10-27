@@ -7,8 +7,10 @@ import { signalState } from './StreetFurniture.js';
 const THREE = window.THREE;
 
 const CAR_TYPES = {
-  sedan: { name: '轿车', nameEn: 'Sedan', length: 4.5, colors: [0xd8d8d8, 0x1d1f24, 0xb8202a, 0x2a4f8f, 0xf1f1ee, 0x6b6f75, 0x8a1c2b], weight: 5 },
-  suv: { name: '越野车', nameEn: 'SUV', length: 4.8, colors: [0xf1f1ee, 0x2b2e33, 0x3e5f3a, 0x8a8f96, 0x1f3e66], weight: 3 },
+  sedan: { name: '轿车', nameEn: 'Sedan', length: 4.5, colors: [0x1d1f24, 0xb8202a, 0x2a4f8f, 0xf1f1ee, 0x8a1c2b], weight: 5 },
+  suv: { name: '越野车', nameEn: 'SUV', length: 4.8, colors: [0xf1f1ee, 0x2b2e33, 0x3e5f3a, 0x1f3e66], weight: 3 },
+  // Replaces the old gray sedans and SUVs. White body, blue stripe, roof light bar.
+  police: { name: '警车', nameEn: 'Police Cruiser', length: 4.7, colors: [0xffffff], weight: 2 },
   taxi: { name: '出租车', nameEn: 'Taxi', length: 4.5, colors: [0xf2c21b], weight: 2 },
   bus: { name: '公交车', nameEn: 'City Bus', length: 11, colors: [0x2f8f4a], weight: 0 },
 };
@@ -58,6 +60,40 @@ function routeSignGeometry() {
   return mergeSimple(geos);
 }
 
+/** Door boards for a patrol car. Local +Z is forward. */
+function policeSignTexture() {
+  const c = makeCanvas(512, 128);
+  const x = c.getContext('2d');
+  x.fillStyle = '#143a86';
+  x.fillRect(0, 0, 512, 128);
+  x.fillStyle = '#f4f7fb';
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  x.font = 'bold 72px "Helvetica Neue",Arial,sans-serif';
+  x.fillText('POLICE', 256, 64);
+  return canvasTexture(c, { anisotropy: 4 });
+}
+
+function policeSignGeometry() {
+  const geos = [];
+  const quad = (x, ry) => {
+    const g = new THREE.PlaneGeometry(1.2, 0.32);
+    g.rotateY(ry);
+    g.translate(x, 1.02, 0.25);
+    geos.push(g);
+  };
+  quad(0.94, Math.PI / 2);
+  quad(-0.94, -Math.PI / 2);
+  return mergeSimple(geos);
+}
+
+/** One lamp of the roof light bar, in car-local space. */
+function policeLampGeometry(red) {
+  const g = new THREE.BoxGeometry(0.26, 0.1, 0.16);
+  g.translate(red ? -0.2 : 0.2, 1.68, 0.05);
+  return g;
+}
+
 /** Vehicle bodies built from boxes; the instance color tints the white body parts. Forward is local +Z. */
 function carGeometry(type) {
   const parts = [];
@@ -80,6 +116,22 @@ function carGeometry(type) {
     for (const z of [3.6, -3.4]) for (const x of [-1.1, 1.1]) wheel(x, z, 0.5, 0.32);
     return mergeColored(parts);
   }
+  if (type === 'police') {
+    const L = 4.7, W = 1.86, baseH = 0.64, cabH = 0.56, y0 = 0.32;
+    const cabL = 2.25, cabZ = -0.1;
+    add(W, baseH, L, 0, y0 + baseH / 2, 0, body);
+    add(W - 0.1, cabH, cabL, 0, y0 + baseH + cabH / 2, cabZ, body);
+    add(W - 0.08, cabH * 0.72, cabL + 0.02, 0, y0 + baseH + cabH * 0.42, cabZ, glass);
+    add(W - 0.14, cabH * 0.7, 0.06, 0, y0 + baseH + cabH * 0.4, cabZ + cabL / 2 + 0.02, glass);
+    add(W + 0.03, 0.22, L * 0.62, 0, y0 + baseH * 0.55, 0.2, 0x163a86);
+    add(W - 0.25, 0.05, 1.15, 0, y0 + baseH + 0.03, L / 2 - 0.75, 0x163a86);
+    add(W + 0.03, 0.14, L + 0.02, 0, y0 + 0.1, 0, trim);
+    add(W - 0.35, 0.12, 0.1, 0, y0 + 0.4, L / 2 + 0.02, 0x202226);
+    add(0.78, 0.1, 0.32, 0, y0 + baseH + cabH + 0.06, 0.05, 0x1a1a1a);
+    const wz = L / 2 - 0.85;
+    for (const z of [wz, -wz]) for (const x of [-W / 2 + 0.08, W / 2 - 0.08]) wheel(x, z, 0.34);
+    return mergeColored(parts);
+  }
   const L = type === 'suv' ? 4.8 : 4.5, W = type === 'suv' ? 1.95 : 1.8;
   const baseH = type === 'suv' ? 0.95 : 0.7, cabH = type === 'suv' ? 0.75 : 0.6;
   const y0 = type === 'suv' ? 0.42 : 0.3;
@@ -100,9 +152,9 @@ function carGeometry(type) {
 
 /** Head (front, warm white) and tail (rear, red) light quads for one vehicle type. */
 function lightGeometry(type, front) {
-  const L = type === 'bus' ? 11 : type === 'suv' ? 4.8 : 4.5;
-  const W = type === 'bus' ? 2.5 : type === 'suv' ? 1.95 : 1.8;
-  const y = type === 'bus' ? 0.95 : type === 'suv' ? 0.95 : 0.75;
+  const L = type === 'bus' ? 11 : type === 'suv' ? 4.8 : type === 'police' ? 4.7 : 4.5;
+  const W = type === 'bus' ? 2.5 : type === 'suv' ? 1.95 : type === 'police' ? 1.86 : 1.8;
+  const y = type === 'bus' ? 0.95 : type === 'suv' ? 0.95 : type === 'police' ? 0.72 : 0.75;
   const geos = [];
   for (const sx of [-1, 1]) {
     const g = new THREE.BoxGeometry(0.36, 0.14, 0.05);
@@ -227,7 +279,23 @@ export class Traffic {
       const head = new THREE.InstancedMesh(lightGeometry(type, true), headMat, n);
       const tail = new THREE.InstancedMesh(lightGeometry(type, false), tailMat, n);
       body.castShadow = true; body.receiveShadow = true;
-      for (const m of [body, head, tail]) { m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; this.group.add(m); }
+      const extras = [body, head, tail];
+      let policeSign = null;
+      let policeRed = null;
+      let policeBlue = null;
+      if (type === 'police') {
+        const map = policeSignTexture();
+        const mat = new THREE.MeshStandardMaterial({ map, roughness: 0.45, metalness: 0.05 });
+        policeSign = new THREE.InstancedMesh(policeSignGeometry(), mat, n);
+        const redMat = new THREE.MeshStandardMaterial({ color: 0xff2a2a, emissive: 0xff1a1a, emissiveIntensity: 0.4 });
+        const blueMat = new THREE.MeshStandardMaterial({ color: 0x2a6bff, emissive: 0x1a4dff, emissiveIntensity: 0.4 });
+        this.policeRedMat = redMat;
+        this.policeBlueMat = blueMat;
+        policeRed = new THREE.InstancedMesh(policeLampGeometry(true), redMat, n);
+        policeBlue = new THREE.InstancedMesh(policeLampGeometry(false), blueMat, n);
+        extras.push(policeSign, policeRed, policeBlue);
+      }
+      for (const m of extras) { m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; this.group.add(m); }
       const def = CAR_TYPES[type];
       const infos = [];
       const color = new THREE.Color();
@@ -242,12 +310,18 @@ export class Traffic {
           const sign = signs[i % BUS_ROUTES.length];
           car.sign = sign.mesh; car.signIndex = sign.used++;
         }
+        if (policeSign) {
+          car.sign = policeSign; car.signIndex = i;
+          car.lampRed = policeRed; car.lampBlue = policeBlue;
+        }
         infos.push(route ? {
           id: `bus-${route.no}-${i}`, name: `${route.no}路公交车`, nameEn: `Bus Route ${route.no}`, category: '交通 Traffic',
           description: `${route.no}路：${route.from} ⇄ ${route.to}。车头、车尾和车身两侧的 LED 路牌显示线路号，经桥梁往返各岛。`,
         } : {
           id: `car-${type}-${i}`, name: def.name, nameEn: def.nameEn, category: '交通 Traffic',
-          description: '行驶在南瓜岛道路上的车辆，遵守红绿灯并保持车距。',
+          description: type === 'police'
+            ? '祖托皮亚警察局的巡逻车：白车身、蓝条纹和车顶警灯，沿南瓜中心岛的街道巡逻，也会过桥但会绕回来。'
+            : '行驶在南瓜岛道路上的车辆，遵守红绿灯并保持车距。',
         });
       }
       body.instanceColor.needsUpdate = true;
@@ -259,9 +333,14 @@ export class Traffic {
   }
 
   _spawn(type, def, roadEdges) {
+    let pool = roadEdges;
+    if (type === 'police') {
+      const downtown = roadEdges.filter((e) => Math.abs(e.p0.x) < 170 && Math.abs(e.p0.z) < 160 && Math.abs(e.p1.x) < 170 && Math.abs(e.p1.z) < 160);
+      if (downtown.length) pool = downtown;
+    }
     let e, s;
     for (let k = 0; k < 60; k++) {
-      e = roadEdges[Math.floor(this.rng() * roadEdges.length)];
+      e = pool[Math.floor(this.rng() * pool.length)];
       s = this.rng() * e.len;
       const p = new THREE.Vector3();
       this._edgePoint(e, s, 0, p);
@@ -269,8 +348,8 @@ export class Traffic {
     }
     const car = {
       type, length: def.length, edge: e, s, off: this._laneOffset(e.lanes), curve: null, curveLen: 0,
-      speed: 0, vmax: (type === 'bus' ? 9 : 11) + this.rng() * 3, pos: new THREE.Vector3(), dir: e.dir.clone(),
-      wait: 0,
+      speed: 0, vmax: (type === 'bus' ? 9 : type === 'police' ? 10 : 11) + this.rng() * 3, pos: new THREE.Vector3(), dir: e.dir.clone(),
+      wait: 0, patrol: type === 'police',
     };
     this._edgePoint(e, s, car.off, car.pos);
     this.cars.push(car);
@@ -285,7 +364,15 @@ export class Traffic {
     if (!options.length) next = this.out.get(e.to).find((n) => n.to === e.from) || e;
     else {
       // Prefer going straight a bit more often than turning.
-      const weights = options.map((o) => (o.dir.dot(e.endDir) > 0.9 ? 2.2 : 1));
+      // Patrol cars stay on the central island and head back if a bridge has taken them off it.
+      const weights = options.map((o) => {
+        const straight = o.dir.dot(e.endDir) > 0.9 ? 2.2 : 1;
+        if (!car.patrol) return straight;
+        const mx = (o.from.x + o.to.x) * 0.5, mz = (o.from.z + o.to.z) * 0.5;
+        const central = mx * mx + mz * mz < 210 * 210;
+        const inward = o.to.x * o.to.x + o.to.z * o.to.z <= o.from.x * o.from.x + o.from.z * o.from.z + 80;
+        return straight * (central ? 4 : 0.3) * (inward || central ? 1 : 0.4);
+      });
       let r = this.rng() * weights.reduce((a, b) => a + b, 0);
       next = options[options.length - 1];
       for (let i = 0; i < options.length; i++) { r -= weights[i]; if (r <= 0) { next = options[i]; break; } }
@@ -368,6 +455,11 @@ export class Traffic {
       }
       this._pose(car);
     }
+    if (this.policeRedMat) {
+      const f = 0.5 + 0.5 * Math.sin(time * 14);
+      this.policeRedMat.emissiveIntensity = 0.25 + f * 2.8;
+      this.policeBlueMat.emissiveIntensity = 0.25 + (1 - f) * 2.8;
+    }
     for (const m of this.group.children) m.instanceMatrix.needsUpdate = true;
   }
 
@@ -394,5 +486,9 @@ export class Traffic {
     car.head.setMatrixAt(car.index, m);
     car.tail.setMatrixAt(car.index, m);
     if (car.sign) car.sign.setMatrixAt(car.signIndex, m);
+    if (car.lampRed) {
+      car.lampRed.setMatrixAt(car.index, m);
+      car.lampBlue.setMatrixAt(car.index, m);
+    }
   }
 }
