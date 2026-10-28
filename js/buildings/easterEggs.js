@@ -587,6 +587,124 @@ export function labBench(parent, x, y, z) {
   return g;
 }
 
+/** Jambs and a sign on a solid shell, so the walk-in door is findable. */
+export function entranceFrame(parent, x, z, label, color = 0xc9a14a) {
+  const trim = colorMat(color, { roughness: 0.4, metalness: 0.45 });
+  const h = 3.15;
+  box(parent, 0.18, h, 0.28, x - 1.25, h / 2, z, trim);
+  box(parent, 0.18, h, 0.28, x + 1.25, h / 2, z, trim);
+  box(parent, 2.7, 0.2, 0.28, x, h, z, trim);
+  if (!label) return;
+  const tex = textTexture([label], {
+    width: 512, height: 128, bg: '#5c3318', color: '#fff6e4',
+    font: 'bold 72px "PingFang SC","Microsoft YaHei","Noto Sans CJK SC","WenQuanYi Micro Hei",sans-serif',
+  });
+  const mat = new THREE.MeshStandardMaterial({
+    map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.35, roughness: 0.5,
+  });
+  mesh(parent, new THREE.PlaneGeometry(2.2, 0.55), mat, x, h + 0.45, z + 0.16, { cast: false });
+}
+
+/** Stacked bars and a red 福 box, for the Fulai vault. */
+export function vaultHoard(parent, x, y, z) {
+  const g = at(parent, x, y, z, 0.35);
+  const gold = colorMat(0xf0c14d, { roughness: 0.28, metalness: 0.85, emissive: 0x6a4e10 });
+  const red = colorMat(0x9a1c1c, { roughness: 0.5, emissive: 0x4a0808 });
+  const wood = colorMat(0x6b3a22, { roughness: 0.65 });
+  box(g, 1.55, 0.12, 0.85, 0, 0.42, 0, wood);
+  for (const [dx, dz] of [[-0.62, -0.28], [0.62, -0.28], [-0.62, 0.28], [0.62, 0.28]]) {
+    box(g, 0.1, 0.42, 0.1, dx, 0.21, dz, wood);
+  }
+  box(g, 1.15, 0.22, 0.5, 0, 0.64, 0, gold);
+  box(g, 0.82, 0.18, 0.38, 0.06, 0.84, 0.02, gold);
+  box(g, 0.5, 0.16, 0.26, -0.04, 1.01, 0, gold);
+  box(g, 0.46, 0.62, 0.1, -0.7, 0.9, 0.28, red);
+  mesh(g, new THREE.CylinderGeometry(0.16, 0.16, 0.05, 12), gold, 0.55, 0.55, 0.22, { cast: false });
+  return g;
+}
+
+/** Planetarium projector and a small Saturn. */
+export function starProjector(parent, x, y, z) {
+  const g = at(parent, x, y, z, -0.3);
+  const dark = colorMat(0x1b2733, { roughness: 0.4, metalness: 0.55 });
+  const lens = colorMat(0x9be7ff, { roughness: 0.15, emissive: 0x38d9ff });
+  const gold = colorMat(0xe8d09a, { roughness: 0.4, metalness: 0.45 });
+  const ring = colorMat(0xd9c79a, { roughness: 0.55 });
+  mesh(g, new THREE.CylinderGeometry(0.42, 0.5, 0.12, 12), dark, 0, 0.06, 0);
+  mesh(g, new THREE.CylinderGeometry(0.1, 0.14, 0.7, 10), dark, 0, 0.46, 0);
+  mesh(g, new THREE.SphereGeometry(0.42, 14, 12), dark, 0, 1.15, 0);
+  mesh(g, new THREE.CylinderGeometry(0.16, 0.2, 0.28, 10), lens, 0, 1.15, 0.4, { cast: false });
+  mesh(g, new THREE.SphereGeometry(0.08, 8, 6), lens, 0.55, 1.45, 0, { cast: false });
+  mesh(g, new THREE.SphereGeometry(0.22, 12, 10), gold, -0.7, 0.55, 0.15);
+  const saturn = mesh(g, new THREE.TorusGeometry(0.36, 0.05, 6, 16), ring, -0.7, 0.55, 0.15, { cast: false });
+  saturn.rotation.x = Math.PI / 2.4;
+  return g;
+}
+
+/** A big pearl in a glass case, under the Oriental Pearl. */
+export function pearlVitrine(parent, x, y, z) {
+  const g = at(parent, x, y, z, 0.2);
+  const gold = colorMat(0xf0c14d, { roughness: 0.3, metalness: 0.75 });
+  const pearl = colorMat(0xf6a7c8, { roughness: 0.18, metalness: 0.45, emissive: 0x8a3058 });
+  const glass = new THREE.MeshStandardMaterial({
+    color: 0xd7f3ff, transparent: true, opacity: 0.28, roughness: 0.05,
+  });
+  box(g, 1.15, 0.12, 1.15, 0, 0.06, 0, gold);
+  mesh(g, new THREE.CylinderGeometry(0.16, 0.2, 0.35, 10), gold, 0, 0.28, 0);
+  mesh(g, new THREE.SphereGeometry(0.48, 16, 12), pearl, 0, 0.85, 0);
+  for (const [dx, dz] of [[-0.48, -0.48], [0.48, -0.48], [-0.48, 0.48], [0.48, 0.48]]) {
+    box(g, 0.06, 1.15, 0.06, dx, 0.7, dz, gold, { cast: false });
+  }
+  box(g, 1.05, 1.15, 0.04, 0, 0.72, 0.5, glass, { cast: false });
+  box(g, 1.05, 1.15, 0.04, 0, 0.72, -0.5, glass, { cast: false });
+  box(g, 0.04, 1.15, 1.0, -0.5, 0.72, 0, glass, { cast: false });
+  box(g, 0.04, 1.15, 1.0, 0.5, 0.72, 0, glass, { cast: false });
+  return g;
+}
+
+/** Tiered cake for the hotel ballroom. */
+export function weddingCake(parent, x, y, z) {
+  const g = at(parent, x, y, z, 0.25);
+  const cream = colorMat(0xfff6ee, { roughness: 0.55 });
+  const gold = colorMat(0xf0c14d, { roughness: 0.35, metalness: 0.6 });
+  const berry = colorMat(0xc0392b, { roughness: 0.45, emissive: 0x4a1008 });
+  const stand = colorMat(0xe7e1d6, { roughness: 0.4, metalness: 0.35 });
+  mesh(g, new THREE.CylinderGeometry(0.55, 0.6, 0.08, 16), stand, 0, 0.28, 0);
+  mesh(g, new THREE.CylinderGeometry(0.08, 0.1, 0.4, 8), stand, 0, 0.12, 0);
+  mesh(g, new THREE.CylinderGeometry(0.42, 0.46, 0.38, 14), cream, 0, 0.52, 0);
+  mesh(g, new THREE.TorusGeometry(0.44, 0.03, 6, 16), gold, 0, 0.62, 0, { cast: false }).rotation.x = Math.PI / 2;
+  mesh(g, new THREE.CylinderGeometry(0.3, 0.34, 0.32, 14), cream, 0, 0.86, 0);
+  mesh(g, new THREE.TorusGeometry(0.32, 0.025, 6, 16), gold, 0, 0.96, 0, { cast: false }).rotation.x = Math.PI / 2;
+  mesh(g, new THREE.CylinderGeometry(0.18, 0.22, 0.26, 12), cream, 0, 1.14, 0);
+  mesh(g, new THREE.SphereGeometry(0.08, 8, 6), berry, 0, 1.36, 0, { cast: false });
+  return g;
+}
+
+/** Crystal ball and a little ghost, for the seance room. */
+export function crystalBall(parent, x, y, z) {
+  const g = at(parent, x, y, z, 0.2);
+  const wood = colorMat(0x3a2a22, { roughness: 0.6 });
+  const cloth = colorMat(0x24182a, { roughness: 0.7 });
+  const ball = new THREE.MeshStandardMaterial({
+    color: 0xd7c6ff, transparent: true, opacity: 0.72, roughness: 0.05,
+    emissive: 0x9b6bff, emissiveIntensity: 0.45,
+  });
+  const sheet = colorMat(0xeef6ff, { roughness: 0.5, emissive: 0xbfe6ff });
+  const eye = colorMat(0x1a1a1a, { roughness: 0.4 });
+  box(g, 1.15, 0.1, 0.7, 0, 0.48, 0, wood);
+  for (const [dx, dz] of [[-0.46, -0.26], [0.46, -0.26], [-0.46, 0.26], [0.46, 0.26]]) {
+    box(g, 0.08, 0.48, 0.08, dx, 0.24, dz, wood);
+  }
+  box(g, 1.05, 0.04, 0.62, 0, 0.55, 0, cloth, { cast: false });
+  mesh(g, new THREE.CylinderGeometry(0.16, 0.2, 0.16, 10), wood, 0, 0.66, 0);
+  mesh(g, new THREE.SphereGeometry(0.38, 16, 12), ball, 0, 1.12, 0, { cast: false });
+  mesh(g, new THREE.SphereGeometry(0.16, 8, 6), sheet, 0.62, 0.78, 0.05);
+  mesh(g, new THREE.SphereGeometry(0.1, 8, 6), sheet, 0.62, 0.98, 0.08);
+  mesh(g, new THREE.SphereGeometry(0.025, 5, 4), eye, 0.66, 1.0, 0.16, { cast: false });
+  mesh(g, new THREE.SphereGeometry(0.025, 5, 4), eye, 0.58, 1.0, 0.16, { cast: false });
+  return g;
+}
+
 /** A pocket Liberty Bell on a stand. */
 export function libertyBell(parent, x, y, z) {
   const g = at(parent, x, y, z);

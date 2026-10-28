@@ -129,13 +129,13 @@ export const LANDMARKS = [
   {
     type: 'fourSeasons', id: 'four-seasons',
     name: '四季酒店', nameEn: 'Four Seasons Hotel',
-    description: '东林岛上的豪华度假酒店：双塔客房楼、空中连廊、无边泳池，园区内设有摩天轮、旋转木马和过山车的游乐场。',
+    description: '东林岛上的豪华度假酒店：双塔客房楼、空中连廊、无边泳池，园区内设有摩天轮、旋转木马和过山车的游乐场。门廊里的宴会厅可以走进去，里面有一座婚礼蛋糕。',
     position: [446, 111], rotation: 0,
   },
   {
     type: 'ghostMuseum', id: 'ghost-museum',
     name: '幽灵博物馆', nameEn: 'Ghost Museum',
-    description: '扭转的暗色塔身、悬浮的碎片与幽幽发光的裂缝，夜晚有幽灵在建筑周围游荡。展出世界各地的鬼怪传说。',
+    description: '扭转的暗色塔身、悬浮的碎片与幽幽发光的裂缝，夜晚有幽灵在建筑周围游荡。展出世界各地的鬼怪传说。拱门里的降灵室可以走进去，里面有水晶球。',
     position: [-104, -450], rotation: PI,
   },
   {
@@ -159,19 +159,19 @@ export const LANDMARKS = [
   {
     type: 'planetarium', id: 'planetarium',
     name: '天文馆', nameEn: 'Planetarium',
-    description: '北原岛上的天文馆：流线形的银色主馆前端高高翘起，屋顶托着一颗巨大的球幕影院，右侧通过桁架廊桥连接观星球。夜晚球体会亮起星图。',
+    description: '北原岛上的天文馆：流线形的银色主馆前端高高翘起，屋顶托着一颗巨大的球幕影院，右侧通过桁架廊桥连接观星球。夜晚球体会亮起星图。正门球幕厅可以走进去，里面有一台星空放映机。',
     position: [10, -538], rotation: 0,
   },
   {
     type: 'orientalPearl', id: 'oriental-pearl',
     name: '东方明珠', nameEn: 'Oriental Pearl Tower',
-    description: '东方明珠岛的地标电视塔：三根擎天立柱托起大小 11 颗粉红色"明珠"，下球体与上球体设观光层，顶部是太空舱与天线桅杆，高约 188 米。夜晚灯光变幻。',
+    description: '东方明珠岛的地标电视塔：三根擎天立柱托起大小 11 颗粉红色"明珠"，下球体与上球体设观光层，顶部是太空舱与天线桅杆，高约 188 米。夜晚灯光变幻。塔座观光厅可以走进去，里面有一颗大明珠。',
     position: [561, -413], rotation: 0,
   },
   {
     type: 'fulaiTower', id: 'fulai-tower',
     name: '福来大厦', nameEn: 'Fulai Tower',
-    description: '香槟金色的八角形超高层，三段逐级扭转退台，顶部是镂空金冠与发光的"福"字灯笼，寓意福气到来。',
+    description: '香槟金色的八角形超高层，三段逐级扭转退台，顶部是镂空金冠与发光的"福"字灯笼，寓意福气到来。正门金库可以走进去，里面是一摞金条。',
     position: [455, -412], rotation: 0,
   },
   {

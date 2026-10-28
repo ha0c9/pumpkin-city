@@ -3,7 +3,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { textTexture, makeCanvas, canvasTexture, mulberry32 } from '../core/Utils.js';
 import { curtainWallMaterial, windowWallMaterial, sharedMaterial, colorMat, box, tiledBox, mesh, rod } from './materials.js';
-import { grandPiano } from './easterEggs.js';
+import { grandPiano, secretRoom, weddingCake, entranceFrame, markInterior } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -167,7 +167,7 @@ function rollerCoaster(ctx, g, pts) {
 registerBuilding('fourSeasons', {
   label: '酒店 Hotel',
   footprint: [68, 98],
-  create(ctx) {
+  create(ctx, spec) {
     const g = new THREE.Group();
     const rng = mulberry32(44);
     const white = sharedMaterial('white');
@@ -249,6 +249,14 @@ registerBuilding('fourSeasons', {
     g.add(balloons);
 
     grandPiano(g, -3.2, 0.32, -16.5, 0.5);
+    entranceFrame(g, 0, -21.55, '宴会厅');
+    secretRoom(g, -1.44, 0.36, -22.4, 0, {
+      wall: 0xf7f1e6, floor: 0xe7d7b8, trim: 0xcaa86a,
+      width: 8, depth: 5.4, height: 4.2,
+      sign: ['宴会厅', 'BALLROOM'],
+      furnish(room, spot) { weddingCake(room, spot.x, spot.y, spot.z).scale.setScalar(1.5); },
+    });
+    markInterior(ctx, spec, [[-1.4, -19, 10, 14]]);
     g.userData.animate = (t) => {
       animWheel(t); animCarousel(t); animCoaster(t);
       balloons.rotation.y = Math.sin(t * 0.6) * 0.2;

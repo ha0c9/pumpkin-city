@@ -3,7 +3,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { makeCanvas, canvasTexture, textTexture } from '../core/Utils.js';
 import { curtainWallMaterial, sharedMaterial, colorMat, tiledBox, box, mesh, rod } from './materials.js';
-import { pearlOnCushion } from './easterEggs.js';
+import { pearlOnCushion, secretRoom, pearlVitrine, entranceFrame, markInterior } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -29,7 +29,7 @@ function pearlTextures() {
 registerBuilding('orientalPearl', {
   label: '电视塔 TV Tower',
   footprint: [70, 70],
-  create(ctx) {
+  create(ctx, spec) {
     const g = new THREE.Group();
     const concrete = colorMat(0xe9e6e1, { roughness: 0.55, metalness: 0.15 });
     const steel = sharedMaterial('steel');
@@ -95,6 +95,14 @@ registerBuilding('orientalPearl', {
 
     // Night show: the pearls slowly cycle through pink, violet and gold.
     pearlOnCushion(g, 6.5, 0.32, 22).scale.setScalar(1.6);
+    entranceFrame(g, 0, 18.35, '观光厅', 0xe9e6e1);
+    secretRoom(g, -1.44, 0.34, 17.15, 0, {
+      wall: 0xf8e7ef, floor: 0xd9b8c8, trim: 0xf0c14d,
+      width: 8, depth: 5.4, height: 4.2,
+      sign: ['观光厅', 'HALL'],
+      furnish(room, spot) { pearlVitrine(room, spot.x, spot.y, spot.z).scale.setScalar(1.3); },
+    });
+    markInterior(ctx, spec, [[-1.4, 20, 8, 14]]);
     const hsl = new THREE.Color();
     g.userData.animate = (t) => {
       const k = (Math.sin(t * 0.35) * 0.5 + 0.5);
