@@ -10,7 +10,7 @@ import { BridgePath } from '../js/world/BridgePath.js';
 // Keep in sync with the building modules' `footprint`.
 const FOOTPRINTS = {
   americaTower: [36, 33], americaMuseum: [52, 42], heritageMuseum: [33, 36], school: [46, 58],
-  homeInn: [40, 22], fourSeasons: [68, 98], ghostMuseum: [46, 46], oceanMuseum: [74, 26],
+  homeInn: [40, 22], policeStation: [54, 50], fourSeasons: [68, 98], ghostMuseum: [46, 46], oceanMuseum: [74, 26],
   oceanGallery: [40, 34], scienceMuseum: [60, 60], americaTower2: [36, 33], planetarium: [116, 40],
   orientalPearl: [70, 70], fulaiTower: [40, 40],
   equestrianCenter: [74, 52], schoolAheadSign: [0.8, 0.8], airport: [200, 120],

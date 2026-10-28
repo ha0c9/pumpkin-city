@@ -12,6 +12,7 @@ import './GhostMuseum.js';
 import './OceanMuseum.js';
 import './OceanGallery.js';
 import './HomeInn.js';
+import './PoliceStation.js';
 import './FourSeasons.js';
 import './ScienceMuseum.js';
 import './ConvenienceStore.js';
