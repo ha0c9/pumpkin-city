@@ -111,8 +111,7 @@ export const QUALITY = IS_MOBILE ? {
   waveTexSize: 256,
   reflectionScale: 0.35,
   refractionScale: 0.4,
-  grassCount: 14000,
-  grassRadius: 55,
+  // grassCount / grassRadius retired: meadows are the flat terrain color, not blade meshes.
   treeCount: 1500,
   rainCount: 4000,
   carCount: 24,
@@ -127,8 +126,7 @@ export const QUALITY = IS_MOBILE ? {
   waveTexSize: 512,
   reflectionScale: 0.5,
   refractionScale: 0.6,
-  grassCount: 45000,
-  grassRadius: 80,
+  // grassCount / grassRadius retired: meadows are the flat terrain color, not blade meshes.
   treeCount: 3600,
   rainCount: 12000,
   carCount: 46,

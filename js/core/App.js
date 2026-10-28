@@ -16,7 +16,6 @@ import { StreetFurniture } from '../world/StreetFurniture.js';
 import { City } from '../world/City.js';
 import { Traffic } from '../world/Traffic.js';
 import { GroundMap } from '../nature/GroundMap.js';
-import { Grass } from '../nature/Grass.js';
 import { Trees } from '../nature/Trees.js';
 import { Animals } from '../nature/Animals.js';
 
@@ -95,9 +94,8 @@ export class App {
     this.furniture = new StreetFurniture(ctx, [...this.roads.lamps, ...this.bridges.lamps], this.roads.signals);
     this.traffic = new Traffic(ctx, this.roads, this.bridges, QUALITY.carCount);
 
-    ui.progress(0.68, '种植草地与树木…'); await nextFrame();
+    ui.progress(0.68, '种植树木…'); await nextFrame();
     this.ground = new GroundMap(this.terrain, ctx.mask, QUALITY.groundRes);
-    this.grass = new Grass(ctx, this.ground);
     this.trees = new Trees(ctx, this.terrain, this.ground, ctx.mask, [...this.city.treeSpots, ...this.roads.streetTrees]);
     ui.progress(0.82, '小动物入住…'); await nextFrame();
     this.animals = new Animals(ctx, this.terrain, this.ground, ctx.mask, this.water);
@@ -148,7 +146,7 @@ export class App {
       if (info.featured) places.push({ name: info.name, tag: info.category.split(' ')[0], info });
     }
     const islandText = {
-      central: '南瓜岛的城市中心：5×5 街区路网，美国大厦 1 号楼（办公）与 2 号楼（酒店）、美国博物馆、世界遗产博物馆、江苏路第二小学、如家酒店、武夷路南侧的祖托皮亚警察局、南瓜大道意面馆与建筑工地都在这里。西南的机场大桥通往机场岛。',
+      central: '南瓜岛的城市中心：5×5 街区路网，美国大厦 1 号楼（办公）与 2 号楼（酒店）、美国博物馆、世界遗产博物馆、江苏路第二小学、如家酒店、武夷路南侧的南瓜岛动物城警察局、南瓜大道意面馆与建筑工地都在这里。西南的机场大桥通往机场岛。',
       east: '东林岛：四季酒店与它的游乐园（摩天轮、旋转木马、过山车），东侧是起伏的林地和松鼠，北端的明珠大桥一路下坡通往东方明珠岛。',
       north: '北原岛：群岛中地势最高的台地，北原斜拉桥一路上坡通到这里。雾林路边的幽灵博物馆、北原路旁的天文馆，以及大片草原、松林、野兔与松鼠。',
       pearl: '东方明珠岛：粉红明珠串起的东方明珠电视塔与香槟金色的福来大厦隔陆家嘴路相望，南侧是明珠马术训练场，草地上有孔雀，经明珠大桥与东林岛相连。',
@@ -220,7 +218,6 @@ export class App {
     this.water.follow(focus, ctx.camera);
     this.env.feedRain(this.water, focus);
     this.traffic.update(dt, this.time);
-    this.grass.update(ctx.camera);
     this.animals.update(dt, this.time);
     const night = u.uNight.value;
     this.furniture.update(this.time, night, focus);

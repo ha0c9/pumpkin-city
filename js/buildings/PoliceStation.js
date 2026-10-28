@@ -1,10 +1,13 @@
-// 祖托皮亚警察局 — a round sandstone hall with vertical ribs, a grass roof and a glass geodesic dome,
-// in the manner of the Zootopia police headquarters. The street sign reads "Zootopia Police Station".
+// 南瓜岛动物城警察局 — a round sandstone hall with vertical ribs, a grass roof and a glass geodesic dome.
+// The street sign reads 南瓜岛动物城警察局 / Pumpkin Island Animal City Police Station.
+// The entrance sector is open so the curved reception desk and Officer Clawhauser are visible.
 import { registerBuilding } from '../core/Registry.js';
 import { makeCanvas, canvasTexture, mergeColored } from '../core/Utils.js';
 import { colorMat, sharedMaterial, box, mesh, tiledBox } from './materials.js';
 
 const THREE = window.THREE;
+
+const CJK = '"PingFang SC","Microsoft YaHei","Noto Sans CJK SC","Noto Sans SC","WenQuanYi Micro Hei",sans-serif';
 
 function stationSign() {
   const c = makeCanvas(1024, 256);
@@ -17,9 +20,53 @@ function stationSign() {
   x.fillStyle = '#f6efe4';
   x.textAlign = 'center';
   x.textBaseline = 'middle';
-  x.font = 'bold 78px "Helvetica Neue",Arial,sans-serif';
-  x.fillText('Zootopia Police Station', 512, 128);
+  x.font = `bold 68px ${CJK}`;
+  x.fillText('南瓜岛动物城警察局', 512, 96);
+  x.font = 'bold 32px "Helvetica Neue",Arial,sans-serif';
+  x.fillText('Pumpkin Island Animal City Police Station', 512, 172);
   return canvasTexture(c, { anisotropy: 8 });
+}
+
+/** Round lobby badge: 动物城警察, not a trademark English name. */
+function badgeTexture() {
+  const c = makeCanvas(512, 512);
+  const x = c.getContext('2d');
+  x.beginPath();
+  x.arc(256, 256, 246, 0, Math.PI * 2);
+  x.fillStyle = '#f2c14d';
+  x.fill();
+  x.beginPath();
+  x.arc(256, 256, 214, 0, Math.PI * 2);
+  x.fillStyle = '#1d4e89';
+  x.fill();
+  x.beginPath();
+  x.arc(256, 256, 196, 0, Math.PI * 2);
+  x.strokeStyle = '#f2c14d';
+  x.lineWidth = 8;
+  x.stroke();
+  x.save();
+  x.translate(256, 168);
+  x.fillStyle = '#f6e27a';
+  x.beginPath();
+  const spikes = 5, outer = 52, inner = 22;
+  for (let i = 0; i < spikes * 2; i++) {
+    const r = i % 2 ? inner : outer;
+    const a = -Math.PI / 2 + (i * Math.PI) / spikes;
+    const px = Math.cos(a) * r, py = Math.sin(a) * r;
+    if (i === 0) x.moveTo(px, py);
+    else x.lineTo(px, py);
+  }
+  x.closePath();
+  x.fill();
+  x.restore();
+  x.fillStyle = '#f7f1e4';
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  x.font = `bold 52px ${CJK}`;
+  x.fillText('动物城警察', 256, 278);
+  x.font = '22px "Helvetica Neue",Arial,sans-serif';
+  x.fillText('Animal City Police', 256, 332);
+  return canvasTexture(c, { anisotropy: 4 });
 }
 
 /** Upper-hemisphere icosahedron edges, packed into one strut mesh. */
@@ -83,10 +130,207 @@ function sandstoneMaterial() {
   return new THREE.MeshStandardMaterial({ map, roughness: 0.86, metalness: 0.02 });
 }
 
+/** Curved desk, badge pillar, ring light and the cheetah officer. Hall center is z = -3. */
+function addLobby(g, ctx) {
+  const floorMat = new THREE.MeshStandardMaterial({
+    color: 0xd8c4a4, roughness: 0.92, emissive: 0x6a4630, emissiveIntensity: 0.18,
+  });
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(13.1, 40), floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(0, 0.2, -3);
+  floor.receiveShadow = true;
+  g.add(floor);
+
+  const wood = new THREE.MeshStandardMaterial({ color: 0x6b3a22, roughness: 0.74, side: THREE.DoubleSide });
+  const woodTop = new THREE.MeshStandardMaterial({ color: 0x4a2816, roughness: 0.62, side: THREE.DoubleSide });
+  const deskZ = -0.15;
+  const arc0 = -1.05;
+  const arcLen = 2.1;
+  const shell = (radius, height, y, mat, a0 = arc0, len = arcLen) => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, 28, 1, true, a0, len), mat);
+    m.position.set(0, y, deskZ);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    g.add(m);
+    return m;
+  };
+  shell(3.45, 1.08, 0.74, wood);
+  shell(3.12, 1.02, 0.72, wood);
+  shell(3.62, 0.12, 1.3, woodTop, arc0 - 0.05, arcLen + 0.1);
+
+  const gold = colorMat(0xf0c14d, { roughness: 0.35, metalness: 0.65 });
+  const onArc = (ang, r) => [Math.sin(ang) * r, deskZ + Math.cos(ang) * r];
+  const [tx, tz] = onArc(0.82, 3.4);
+  mesh(g, new THREE.CylinderGeometry(0.11, 0.15, 0.07, 8), gold, tx, 1.4, tz);
+  mesh(g, new THREE.CylinderGeometry(0.07, 0.045, 0.16, 8), gold, tx, 1.52, tz);
+  mesh(g, new THREE.SphereGeometry(0.07, 8, 6), gold, tx, 1.66, tz);
+  const [jx, jz] = onArc(-0.78, 3.35);
+  const jar = new THREE.MeshStandardMaterial({
+    color: 0xd7f3ff, transparent: true, opacity: 0.38, roughness: 0.08,
+  });
+  mesh(g, new THREE.CylinderGeometry(0.12, 0.12, 0.22, 10), jar, jx, 1.48, jz, { cast: false });
+  mesh(g, new THREE.CylinderGeometry(0.13, 0.13, 0.04, 10), colorMat(0xf4f1ea, { roughness: 0.4 }), jx, 1.6, jz, { cast: false });
+  [0xe24b32, 0xf0c14d, 0x3d9a4a, 0x3a6fd0].forEach((col, i) => {
+    const a = (i / 4) * Math.PI * 2;
+    mesh(g, new THREE.SphereGeometry(0.035, 6, 4), colorMat(col, { roughness: 0.4 }), jx + Math.cos(a) * 0.04, 1.46, jz + Math.sin(a) * 0.04, { cast: false });
+  });
+
+  const orange = colorMat(0xe08a42, { roughness: 0.78 });
+  box(g, 1.75, 6.5, 1.45, 0, 3.45, 0.05, orange);
+  const badgeTex = badgeTexture();
+  const badgeMat = new THREE.MeshStandardMaterial({
+    map: badgeTex, emissive: 0xffffff, emissiveMap: badgeTex, emissiveIntensity: 0.28, roughness: 0.42,
+  });
+  ctx.nightMaterials.push({ material: badgeMat, intensity: 0.75, base: 0.28 });
+  const badge = new THREE.Mesh(new THREE.CircleGeometry(0.74, 28), badgeMat);
+  badge.position.set(0, 3.85, 0.8);
+  g.add(badge);
+
+  const lampMat = new THREE.MeshStandardMaterial({
+    color: 0xfff6e4, emissive: 0xfff1cc, emissiveIntensity: 0.9, roughness: 0.32,
+  });
+  ctx.nightMaterials.push({ material: lampMat, intensity: 1.35, base: 0.9 });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(3.5, 0.18, 8, 32), lampMat);
+  ring.rotation.x = Math.PI / 2;
+  ring.position.set(0, 7.45, 0.4);
+  g.add(ring);
+  mesh(g, new THREE.CylinderGeometry(0.035, 0.035, 1.6, 6), colorMat(0x8a8680, { roughness: 0.45, metalness: 0.35 }), 0, 8.35, 0.4, { cast: false });
+
+  const officer = makeOfficer();
+  officer.position.set(0, 0, 1.85);
+  officer.scale.setScalar(1.35);
+  officer.userData.dynamic = true;
+  g.add(officer);
+  g.userData.animate = (t) => {
+    const wave = officer.userData.wave;
+    wave.rotation.z = 0.5 + Math.sin(t * 1.7) * 0.16;
+    wave.rotation.x = 0.28 + Math.sin(t * 1.15) * 0.07;
+    const breath = 1 + Math.sin(t * 1.45) * 0.02;
+    officer.userData.body.scale.set(1.22, 0.9 * breath, 0.96);
+  };
+}
+
+/** Chubby spotted cheetah in a blue uniform, one paw raised. Flat colors, no skinning. */
+function makeOfficer() {
+  const root = new THREE.Group();
+  const fur = colorMat(0xf0b02e, { roughness: 0.7 });
+  const spot = colorMat(0xc47816, { roughness: 0.72 });
+  const muzzleC = colorMat(0xf6d48a, { roughness: 0.68 });
+  const blue = colorMat(0x2c5ed2, { roughness: 0.5 });
+  const bow = colorMat(0x1a2030, { roughness: 0.4 });
+  const dark = colorMat(0x241810, { roughness: 0.5 });
+  const white = colorMat(0xf7f4ee, { roughness: 0.45 });
+  const pink = colorMat(0xf0a0a4, { roughness: 0.55 });
+  const noseC = colorMat(0x3a2a22, { roughness: 0.45 });
+
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.58, 14, 12), blue);
+  body.scale.set(1.22, 0.9, 0.96);
+  body.position.y = 1.2;
+  root.add(body);
+  root.userData.body = body;
+
+  const collar = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), blue);
+  collar.position.set(0, 1.7, 0.16);
+  collar.scale.set(1.35, 0.65, 0.8);
+  root.add(collar);
+  const tie = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), bow);
+  tie.scale.set(1.7, 0.65, 0.65);
+  tie.position.set(0, 1.66, 0.36);
+  root.add(tie);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.44, 14, 12), fur);
+  head.position.set(0, 2.15, 0.04);
+  root.add(head);
+  const snout = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), muzzleC);
+  snout.position.set(0, 2.04, 0.32);
+  snout.scale.set(1.1, 0.72, 0.85);
+  root.add(snout);
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), noseC);
+  nose.position.set(0, 2.1, 0.5);
+  root.add(nose);
+  const smile = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.016, 5, 10, Math.PI), dark);
+  smile.position.set(0, 1.94, 0.48);
+  smile.rotation.z = Math.PI;
+  root.add(smile);
+
+  for (const s of [-1, 1]) {
+    const eyeW = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 6), white);
+    eyeW.position.set(s * 0.15, 2.22, 0.36);
+    eyeW.scale.set(1, 1.15, 0.5);
+    root.add(eyeW);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.036, 6, 5), dark);
+    pupil.position.set(s * 0.15, 2.22, 0.41);
+    root.add(pupil);
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), fur);
+    ear.position.set(s * 0.3, 2.52, -0.02);
+    ear.scale.set(0.8, 1.05, 0.5);
+    root.add(ear);
+    const inner = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 5), pink);
+    inner.position.set(s * 0.3, 2.5, 0.05);
+    inner.scale.set(0.65, 0.85, 0.35);
+    root.add(inner);
+    const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 5), pink);
+    cheek.position.set(s * 0.24, 2.02, 0.32);
+    cheek.scale.set(1.1, 0.65, 0.45);
+    root.add(cheek);
+  }
+
+  const spotGeo = new THREE.SphereGeometry(0.045, 5, 4);
+  for (const [x, y, z, sc] of [
+    [-0.22, 2.34, 0.16, 1], [0.22, 2.38, 0.08, 0.85], [-0.08, 2.48, 0.16, 0.7],
+    [0.28, 2.18, 0.1, 0.8], [-0.32, 2.16, 0, 0.9], [0.06, 2.5, -0.08, 0.7],
+    [-0.15, 2.28, -0.28, 0.8], [0.18, 2.22, -0.3, 0.75],
+  ]) {
+    const sp = new THREE.Mesh(spotGeo, spot);
+    sp.position.set(x, y, z);
+    sp.scale.setScalar(sc);
+    root.add(sp);
+  }
+
+  const wave = new THREE.Group();
+  wave.position.set(-0.62, 1.55, 0.1);
+  const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.1, 0.4, 8), fur);
+  upper.position.y = 0.18;
+  wave.add(upper);
+  const paw = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), fur);
+  paw.position.set(0, 0.42, 0.02);
+  wave.add(paw);
+  const pad = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 5), pink);
+  pad.position.set(0, 0.44, 0.12);
+  wave.add(pad);
+  root.add(wave);
+  root.userData.wave = wave;
+
+  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.38, 8), fur);
+  arm.position.set(0.55, 1.32, 0.22);
+  arm.rotation.z = -0.8;
+  arm.rotation.x = 0.35;
+  root.add(arm);
+
+  const tail = new THREE.Group();
+  tail.position.set(0.42, 1.05, -0.28);
+  const t1 = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), fur);
+  t1.position.set(0.14, 0.02, -0.06);
+  tail.add(t1);
+  const t2 = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), fur);
+  t2.position.set(0.3, 0.16, -0.02);
+  tail.add(t2);
+  const t3 = new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 4), spot);
+  t3.position.set(0.22, 0.1, 0.04);
+  tail.add(t3);
+  root.add(tail);
+  return root;
+}
+
 registerBuilding('policeStation', {
-  label: '警察局 Police Station',
+  label: '南瓜岛动物城警察局',
   footprint: [54, 50],
-  info: () => ({ featured: true, category: '警察局 Police Station' }),
+  info: () => ({
+    featured: true,
+    category: '警察局 Police Station',
+    name: '南瓜岛动物城警察局',
+    nameEn: 'Pumpkin Island Animal City Police Station',
+  }),
   create(ctx) {
     const g = new THREE.Group();
     const sand = sandstoneMaterial();
@@ -100,15 +344,31 @@ registerBuilding('policeStation', {
 
     tiledBox(g, 54, 0.16, 50, 0, 0.08, 0, sharedMaterial('paving'), 0.45);
 
-    // Round hall, set back so the stairs and crest sit on the street side (+Z).
+    // Round hall, open on the street side (+Z, theta 0) so the lobby reads from the steps and the dome.
     const R = 13.5;
     const hallH = 9.2;
-    const hall = new THREE.Mesh(new THREE.CylinderGeometry(R, R + 0.4, hallH, 40), sand);
+    const gap = 0.9;
+    sand.side = THREE.DoubleSide;
+    const hall = new THREE.Mesh(
+      new THREE.CylinderGeometry(R, R + 0.4, hallH, 48, 1, true, gap / 2, Math.PI * 2 - gap),
+      sand,
+    );
     hall.position.set(0, hallH / 2 + 0.2, -3);
     hall.castShadow = true;
     hall.receiveShadow = true;
     g.add(hall);
-    mesh(g, new THREE.CylinderGeometry(R + 0.7, R + 0.9, 0.7, 40), rib, 0, 0.55, -3);
+    const plinth = new THREE.Mesh(
+      new THREE.CylinderGeometry(R + 0.7, R + 0.9, 0.7, 48, 1, true, gap / 2, Math.PI * 2 - gap),
+      rib,
+    );
+    plinth.position.set(0, 0.55, -3);
+    plinth.castShadow = true;
+    g.add(plinth);
+    for (const s of [-1, 1]) {
+      const ang = s * gap / 2;
+      const jamb = box(g, 0.5, hallH, 1.4, Math.sin(ang) * (R - 0.2), hallH / 2 + 0.2, Math.cos(ang) * (R - 0.2) - 3, rib);
+      jamb.rotation.y = ang;
+    }
 
     const fin = new THREE.BoxGeometry(1.05, hallH + 1.4, 2.6);
     for (let i = 0; i < 24; i++) {
@@ -139,8 +399,15 @@ registerBuilding('policeStation', {
       g.add(m);
     }
 
-    // Grass roof and the geodesic dome.
-    mesh(g, new THREE.CylinderGeometry(R + 1.1, R + 0.6, 0.55, 40), grass, 0, hallH + 0.45, -3);
+    // Grass roof with a round opening under the dome so the lobby is visible from above.
+    const roofMat = grass.clone();
+    roofMat.side = THREE.DoubleSide;
+    const roof = new THREE.Mesh(new THREE.RingGeometry(7.15, R + 1.15, 48), roofMat);
+    roof.rotation.x = -Math.PI / 2;
+    roof.position.set(0, hallH + 0.48, -3);
+    roof.castShadow = true;
+    roof.receiveShadow = true;
+    g.add(roof);
     mesh(g, new THREE.TorusGeometry(7.4, 0.45, 8, 28), grassDark, 0, hallH + 0.7, -3);
     const domeY = hallH + 0.75;
     const domeGlass = new THREE.Mesh(
@@ -174,9 +441,15 @@ registerBuilding('policeStation', {
       m.rotation.z = rz;
     }
 
-    // Door and the name plaque. Front faces +Z.
-    box(g, 4.2, 3.4, 0.35, 0, 2.1, 13.55, colorMat(0x1c242c, { roughness: 0.4, metalness: 0.4 }));
-    box(g, 4.6, 0.18, 0.5, 0, 3.9, 13.6, white);
+    // Open doorway (glass at the sides only) and the name plaque. Front faces +Z.
+    box(g, 0.42, 3.5, 0.5, -3.15, 1.95, 13.4, white);
+    box(g, 0.42, 3.5, 0.5, 3.15, 1.95, 13.4, white);
+    box(g, 6.7, 0.28, 0.5, 0, 3.56, 13.4, white);
+    const doorGlass = new THREE.MeshStandardMaterial({
+      color: 0xc5e4ee, metalness: 0.3, roughness: 0.08, transparent: true, opacity: 0.16,
+    });
+    box(g, 1.2, 3.15, 0.08, -1.9, 1.9, 13.48, doorGlass, { cast: false });
+    box(g, 1.2, 3.15, 0.08, 1.9, 1.9, 13.48, doorGlass, { cast: false });
     const signTex = stationSign();
     const signMat = new THREE.MeshStandardMaterial({
       map: signTex, emissive: 0xffffff, emissiveMap: signTex, emissiveIntensity: 0.18, roughness: 0.55,
@@ -196,6 +469,8 @@ registerBuilding('policeStation', {
       mesh(g, new THREE.CylinderGeometry(0.28, 0.34, 1.15, 10), white, x, 0.7, 20.5);
       mesh(g, new THREE.SphereGeometry(0.22, 10, 8), colorMat(0x1d4e89, { roughness: 0.4, metalness: 0.2 }), x, 1.35, 20.5);
     }
+
+    addLobby(g, ctx);
 
     g.userData.treeSpots = [[-20, 16], [20, 16], [-18, -16], [18, -16]];
     g.userData.height = hallH + 8;
