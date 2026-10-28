@@ -232,8 +232,10 @@ registerBuilding('school', {
     box(gh, ghW / 2 - gapR, ghH, t, (ghW / 2 + gapR) / 2, mid, -ghD / 2, shell);
     box(gh, doorW, ghH - doorH, t, doorX, y0 + doorH + (ghH - doorH) / 2, -ghD / 2, shell);
     // Screen so the campus door does not look straight at the cage.
-    box(gh, t, ghH - 0.2, 1.55, 0.45, mid, -0.85, shell);
-    classHamster(gh, 1.45, y0 + 0.02, -0.55);
+    box(gh, t, ghH - 0.2, 1.15, 0.45, mid, -0.95, shell);
+    const hamster = classHamster(gh, 1.65, y0 + 0.02, 0.55);
+    hamster.scale.setScalar(2.3);
+    hamster.userData.secretPet = true;
     box(gh, ghW + 0.6, 0.3, ghD + 0.6, 0, ghH + 0.25, 0, colorMat(0x9c3b2a, { roughness: 0.7 }));
     const win = new THREE.MeshStandardMaterial({ color: 0x5f86a3, metalness: 0.6, roughness: 0.1, emissive: 0xffe0a8, emissiveIntensity: 0 });
     ctx.nightMaterials.push({ material: win, intensity: 0.8 });

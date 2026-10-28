@@ -123,16 +123,16 @@ export function buildRestaurant(ctx, spec) {
   pastaBowl(g, 2.6, 1.08, 1.28).scale.setScalar(2.3);
   // Opaque kitchen on the right. The door faces the dining room; the pumpkin
   // and the recipe sit in the alcove, off the street sightline.
-  secretRoom(g, 3.2, 0.26, -1.25, -Math.PI / 2, {
+  secretRoom(g, 3.05, 0.26, -0.95, -Math.PI / 2, {
     wall: 0xf6efe4, floor: 0x8d5a32, trim: 0x5c3318,
-    width: 3.15, depth: 2.0, height: 2.8,
+    width: 3.8, depth: 2.25, height: 2.85,
     sign: ['后厨', 'KITCHEN'],
-    furnish(room, spot) { pantryShelf(room, spot.x, spot.y, spot.z).scale.setScalar(0.7); },
+    furnish(room, spot) { pantryShelf(room, spot.x, spot.y, spot.z).scale.setScalar(1.45); },
   });
   markInterior(ctx, spec, [
     [0.4, 1.2, 12, 9],
     [1.2, 6.4, 7, 6],
-    [4.2, -1.2, 3.2, 3.6],
+    [4.15, -0.95, 2.6, 4.2],
   ]);
   const upper = [[-0.4, -1.2], [2.2, -1.2], [0.9, 1.15]];
   for (const [x, z] of upper) table(g, x, floorH + 0.28, z, stairMat, cloth, chair);

@@ -80,9 +80,9 @@ registerBuilding('homeInn', {
     box(g, 16, 0.06, 10, 0, floorH + 0.05, -0.5, ceil, { cast: false });
     secretRoom(g, -5.4, 0.28, -2.4, Math.PI / 2, {
       wall: 0xf7f1e6, floor: 0xe7d7b8, trim: 0x1b4fa0,
-      width: 4.4, depth: 3.6, height: 2.95,
+      width: 5.4, depth: 3.8, height: 2.95,
       sign: ['备品间', 'LINEN'],
-      furnish(room, spot) { hotelNook(room, spot.x, spot.y, spot.z); },
+      furnish(room, spot) { hotelNook(room, spot.x, spot.y, spot.z).scale.setScalar(1.55); },
     });
     markInterior(ctx, spec, [
       [0, 5, 18, 20],

@@ -51,7 +51,7 @@ registerBuilding('scienceMuseum', {
       wall: 0x1b2733, floor: 0x243044, trim: 0x7fd4ff,
       width: 8.4, depth: 2.35, height: 4.05,
       sign: ['实验室', 'LAB'],
-      furnish(room, spot) { labBench(room, spot.x, spot.y, spot.z); },
+      furnish(room, spot) { labBench(room, spot.x, spot.y, spot.z).scale.setScalar(1.75); },
     });
     markInterior(ctx, spec, [
       [0, 26, 12, 20],

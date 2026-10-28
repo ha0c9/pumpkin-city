@@ -417,27 +417,34 @@ export function secretRoom(parent, x, y, z, ry, opts = {}) {
   });
   const T = 0.16;
   const hw = width / 2;
-  const doorW = Math.min(1.65, Math.max(1.15, width - 1.2));
+  // Door sits toward +X so the -X bay is wide enough for a person and a large prop.
+  const doorW = Math.min(1.35, Math.max(1.02, width * 0.3));
   const doorH = Math.min(2.35, height - 0.55);
+  const doorShift = Math.max(0.15, Math.min(hw - doorW / 2 - 0.28, width * 0.18));
+  const leftEdge = doorShift - doorW / 2;
+  const rightEdge = doorShift + doorW / 2;
   box(g, width, 0.08, depth, 0, 0.04, -depth / 2, floorMat, { cast: false });
   box(g, width - 0.12, 0.08, depth - 0.12, 0, height - 0.12, -depth / 2, ceilMat, { cast: false });
   box(g, width + T, height, T, 0, height / 2, -depth, wallMat);
   box(g, T, height, depth, -hw, height / 2, -depth / 2, wallMat);
   box(g, T, height, depth, hw, height / 2, -depth / 2, wallMat);
-  const sideW = (width - doorW) / 2;
-  box(g, sideW, height, T, -hw + sideW / 2, height / 2, 0, wallMat);
-  box(g, sideW, height, T, hw - sideW / 2, height / 2, 0, wallMat);
-  box(g, doorW + 0.02, height - doorH, T, 0, doorH + (height - doorH) / 2, 0, wallMat);
-  box(g, 0.07, doorH, 0.1, -doorW / 2, doorH / 2, 0.05, trimMat, { cast: false });
-  box(g, 0.07, doorH, 0.1, doorW / 2, doorH / 2, 0.05, trimMat, { cast: false });
-  box(g, doorW + 0.14, 0.08, 0.1, 0, doorH, 0.05, trimMat, { cast: false });
-  const leaf = box(g, doorW * 0.88, doorH - 0.08, 0.05, doorW / 2 - 0.08, (doorH - 0.08) / 2, -0.55, trimMat);
-  leaf.rotation.y = -0.8;
-  const returnX = -(doorW / 2 + 0.28);
-  const returnLen = Math.min(depth - 0.4, Math.max(1.3, depth * 0.7));
+  const leftW = leftEdge + hw;
+  const rightW = hw - rightEdge;
+  if (leftW > 0.08) box(g, leftW, height, T, -hw + leftW / 2, height / 2, 0, wallMat);
+  if (rightW > 0.08) box(g, rightW, height, T, rightEdge + rightW / 2, height / 2, 0, wallMat);
+  box(g, doorW + 0.02, height - doorH, T, doorShift, doorH + (height - doorH) / 2, 0, wallMat);
+  box(g, 0.07, doorH, 0.1, leftEdge, doorH / 2, 0.05, trimMat, { cast: false });
+  box(g, 0.07, doorH, 0.1, rightEdge, doorH / 2, 0.05, trimMat, { cast: false });
+  box(g, doorW + 0.14, 0.08, 0.1, doorShift, doorH, 0.05, trimMat, { cast: false });
+  const leaf = box(g, doorW * 0.88, doorH - 0.08, 0.05, rightEdge - 0.06, (doorH - 0.08) / 2, -0.5, trimMat);
+  leaf.rotation.y = -0.75;
+  const returnX = leftEdge - 0.16;
+  // Short jamb screen. It breaks a straight look in from the street, and the
+  // prop sits in the open back of the room so it reads once you step inside.
+  const returnLen = Math.min(0.62, depth * 0.28);
   box(g, T, height, returnLen, returnX, height / 2, -0.05 - returnLen / 2, wallMat);
-  const alcoveX = ((-hw + 0.36) + (returnX - 0.28)) / 2;
-  const alcoveZ = -Math.min(returnLen * 0.55, depth - 0.5);
+  const alcoveX = doorShift - 0.45;
+  const alcoveZ = -Math.min(depth * 0.6, depth - 0.55);
   if (opts.sign) {
     const lines = Array.isArray(opts.sign) ? opts.sign : [opts.sign];
     const tex = textTexture(lines, {
@@ -448,9 +455,10 @@ export function secretRoom(parent, x, y, z, ry, opts = {}) {
     const signMat = new THREE.MeshStandardMaterial({
       map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.3, roughness: 0.5,
     });
-    mesh(g, new THREE.PlaneGeometry(1.2, 0.38), signMat, 0, Math.min(doorH + 0.26, height - 0.24), 0.1, { cast: false });
+    mesh(g, new THREE.PlaneGeometry(1.7, 0.52), signMat, doorShift, Math.min(doorH + 0.32, height - 0.28), 0.1, { cast: false });
   }
-  mesh(g, new THREE.SphereGeometry(0.07, 8, 6), ceilMat, alcoveX, height - 0.28, alcoveZ, { cast: false });
+  mesh(g, new THREE.SphereGeometry(0.12, 8, 6), ceilMat, alcoveX, height - 0.32, alcoveZ, { cast: false });
+  g.userData.secretRoom = { doorShift, alcove: { x: alcoveX, y: 0.85, z: alcoveZ } };
   if (opts.furnish) opts.furnish(g, { x: alcoveX, y: 0.08, z: alcoveZ });
   return g;
 }

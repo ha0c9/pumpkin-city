@@ -167,9 +167,9 @@ registerBuilding('americaMuseum', {
     // Side gallery inside the main hall. The bell is off the front-door axis.
     secretRoom(g, -3.4, 1.28, -6.4, Math.PI / 2, {
       wall: 0xf6f1e6, floor: 0xd9c7a4, trim: 0x6b4a2b,
-      width: 4.4, depth: 3.8, height: 3.15,
+      width: 5.2, depth: 3.8, height: 3.2,
       sign: ['展厅', 'GALLERY'],
-      furnish(room, spot) { libertyBell(room, spot.x, spot.y, spot.z); },
+      furnish(room, spot) { libertyBell(room, spot.x, spot.y, spot.z).scale.setScalar(1.75); },
     });
     markInterior(ctx, spec, [
       [0, 12, 8, 34],

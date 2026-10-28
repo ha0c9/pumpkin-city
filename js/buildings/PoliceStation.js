@@ -499,7 +499,7 @@ registerBuilding('policeStation', {
       wall: 0xf4ead8, floor: 0xd8c4a4, trim: 0xc56d38,
       width: 4.6, depth: 3.5, height: 3.15,
       sign: ['档案室', 'RECORDS'],
-      furnish(room, spot) { slothClerk(room, spot.x, spot.y, spot.z, 0.8); },
+      furnish(room, spot) { slothClerk(room, spot.x, spot.y, spot.z, 0.8).scale.setScalar(1.7); },
     });
     markInterior(ctx, spec, [
       [0, 8, 12, 44],
