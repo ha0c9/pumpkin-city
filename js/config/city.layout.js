@@ -186,6 +186,48 @@ export const LANDMARKS = [
     description: '两座航站楼沿岛的长边排开，圆弧玻璃顶、两层幕墙，下层开门、上层接廊桥，楼里有电梯。塔台在航站楼侧面的空地上。飞机起飞后直飞到天边，再从天边进场降落。台风天停飞，天气转好后恢复。',
     position: [-500, 575], rotation: 0, footprint: [200, 120],
   },
+  {
+    type: 'subwayEntrance', id: 'metro-central',
+    name: '中心站', nameEn: 'Central',
+    description: '长宁路北侧的玻璃地铁门楼，对面是世界遗产博物馆。门楼站名旁边是南瓜岛地铁的圆形标志，楼里有楼梯和扶梯通向地下，旁边立着一块竖排站名的牌子。',
+    position: [40, -143], rotation: 0,
+  },
+  {
+    type: 'subwayEntrance', id: 'metro-east',
+    name: '东林站', nameEn: 'East Grove',
+    description: '四季路东侧的玻璃地铁门楼，西面正对四季酒店。门楼站名旁边是南瓜岛地铁的圆形标志，楼里有楼梯和扶梯通向地下，旁边立着一块竖排站名的牌子。',
+    position: [504, 100], rotation: -PI / 2,
+  },
+  {
+    type: 'subwayEntrance', id: 'metro-north',
+    name: '北原站', nameEn: 'North Meadow',
+    description: '雾林路北侧的玻璃地铁门楼，北面是天文馆。门楼站名旁边是南瓜岛地铁的圆形标志，楼里有楼梯和扶梯通向地下，旁边立着一块竖排站名的牌子。',
+    position: [20, -506], rotation: 0,
+  },
+  {
+    type: 'subwayEntrance', id: 'metro-west',
+    name: '西岭站', nameEn: 'West Ridge',
+    description: '科技路西侧的玻璃地铁门楼，对面是科技馆。门楼站名旁边是南瓜岛地铁的圆形标志，楼里有楼梯和扶梯通向地下，旁边立着一块竖排站名的牌子。',
+    position: [-493, -101], rotation: PI / 2,
+  },
+  {
+    type: 'subwayEntrance', id: 'metro-south',
+    name: '南湾站', nameEn: 'South Cove',
+    description: '南湾路南侧的玻璃地铁门楼，后面是海洋博物馆。门楼站名旁边是南瓜岛地铁的圆形标志，楼里有楼梯和扶梯通向地下，旁边立着一块竖排站名的牌子。',
+    position: [180, 504], rotation: PI,
+  },
+  {
+    type: 'subwayEntrance', id: 'metro-pearl',
+    name: '明珠站', nameEn: 'Pearl',
+    description: '陆家嘴路南侧的玻璃地铁门楼，南面是福来大厦。门楼站名旁边是南瓜岛地铁的圆形标志，楼里有楼梯和扶梯通向地下，旁边立着一块竖排站名的牌子。',
+    position: [460, -356], rotation: PI,
+  },
+  {
+    type: 'subwayEntrance', id: 'metro-airport',
+    name: '机场站', nameEn: 'Airport',
+    description: '迎宾路南侧的玻璃地铁门楼，对面是航站楼。门楼站名旁边是南瓜岛地铁的圆形标志，楼里有楼梯和扶梯通向地下，旁边立着一块竖排站名的牌子。',
+    position: [-459, 485], rotation: PI,
+  },
 ];
 
 // Central grid helpers: lot rectangles between road centerlines, inset by the road half-width.

@@ -14,6 +14,7 @@ const FOOTPRINTS = {
   oceanGallery: [40, 34], scienceMuseum: [60, 60], americaTower2: [36, 33], planetarium: [116, 40],
   orientalPearl: [70, 70], fulaiTower: [40, 40],
   equestrianCenter: [74, 52], schoolAheadSign: [0.8, 0.8], airport: [200, 120],
+  subwayEntrance: [15, 12],
 };
 
 const t0 = Date.now();
