@@ -68,9 +68,9 @@ function makeDeer() {
   const sh = true;
   g.add(part(body, fur, 0, 1.02, 0, 0.36, 0.3, 0.64, sh));
   g.add(part(body, light, 0, 0.86, 0.06, 0.26, 0.16, 0.44, sh));
-  const spot = sphere(1, 5, 4);
+  const spot = sphere(0.055, 5, 4);
   for (const [x, y, z] of [[-0.22, 1.18, 0.12], [0.22, 1.2, -0.02], [-0.14, 1.2, -0.26], [0.26, 1.12, 0.26], [0.02, 1.24, 0.08], [-0.28, 1.08, 0.3], [0.16, 1.16, -0.3], [-0.04, 1.16, 0.34]]) {
-    g.add(part(spot, light, x, y, z, 1.15, 0.9, 1));
+    g.add(part(spot, light, x, y, z));
   }
   const neck = new THREE.Group();
   neck.position.set(0, 1.2, 0.4);
@@ -312,7 +312,7 @@ function makeSwan() {
 
 function makeDolphin() {
   const g = new THREE.Group();
-  const grey = mat(0x6a8ea8, 0.4), belly = mat(0xf2f6f8, 0.45), dark = mat(0x243038);
+  const grey = mat(0x4a6d88, 0.4), belly = mat(0xf2f6f8, 0.45), dark = mat(0x243038);
   const s = sphere(1, 12, 10);
   g.add(part(s, grey, 0, 0.02, 0, 0.28, 0.26, 0.85));
   g.add(part(s, belly, 0, -0.06, 0.05, 0.2, 0.14, 0.7));

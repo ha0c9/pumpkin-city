@@ -190,11 +190,11 @@ function addLobby(g, ctx) {
     color: 0xfff6e4, emissive: 0xfff1cc, emissiveIntensity: 0.9, roughness: 0.32,
   });
   ctx.nightMaterials.push({ material: lampMat, intensity: 1.35, base: 0.9 });
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(3.5, 0.18, 8, 32), lampMat);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(2.7, 0.28, 10, 28), lampMat);
   ring.rotation.x = Math.PI / 2;
-  ring.position.set(0, 7.45, 0.4);
+  ring.position.set(0, 6.05, 0.35);
   g.add(ring);
-  mesh(g, new THREE.CylinderGeometry(0.035, 0.035, 1.6, 6), colorMat(0x8a8680, { roughness: 0.45, metalness: 0.35 }), 0, 8.35, 0.4, { cast: false });
+  mesh(g, new THREE.CylinderGeometry(0.04, 0.04, 3.2, 6), colorMat(0x8a8680, { roughness: 0.45, metalness: 0.35 }), 0, 7.7, 0.35, { cast: false });
 
   const officer = makeOfficer();
   officer.position.set(0, 0, 1.85);
@@ -213,8 +213,8 @@ function addLobby(g, ctx) {
 /** Chubby spotted cheetah in a blue uniform, one paw raised. Flat colors, no skinning. */
 function makeOfficer() {
   const root = new THREE.Group();
-  const fur = colorMat(0xf0b02e, { roughness: 0.7 });
-  const spot = colorMat(0xc47816, { roughness: 0.72 });
+  const fur = colorMat(0xe39a22, { roughness: 0.7 });
+  const spot = colorMat(0x5c3210, { roughness: 0.72 });
   const muzzleC = colorMat(0xf6d48a, { roughness: 0.68 });
   const blue = colorMat(0x2c5ed2, { roughness: 0.5 });
   const bow = colorMat(0x1a2030, { roughness: 0.4 });
@@ -233,10 +233,13 @@ function makeOfficer() {
   collar.position.set(0, 1.7, 0.16);
   collar.scale.set(1.35, 0.65, 0.8);
   root.add(collar);
-  const tie = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), bow);
-  tie.scale.set(1.7, 0.65, 0.65);
-  tie.position.set(0, 1.66, 0.36);
+  const tie = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), bow);
+  tie.scale.set(2.1, 0.7, 0.7);
+  tie.position.set(0, 1.64, 0.42);
   root.add(tie);
+  const knot = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 5), bow);
+  knot.position.set(0, 1.7, 0.46);
+  root.add(knot);
 
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.44, 14, 12), fur);
   head.position.set(0, 2.15, 0.04);
@@ -275,11 +278,12 @@ function makeOfficer() {
     root.add(cheek);
   }
 
-  const spotGeo = new THREE.SphereGeometry(0.045, 5, 4);
+  const spotGeo = new THREE.SphereGeometry(0.055, 6, 5);
+  // Sit on the head surface (center 0, 2.15, 0.04, radius 0.44), mostly toward the door.
   for (const [x, y, z, sc] of [
-    [-0.22, 2.34, 0.16, 1], [0.22, 2.38, 0.08, 0.85], [-0.08, 2.48, 0.16, 0.7],
-    [0.28, 2.18, 0.1, 0.8], [-0.32, 2.16, 0, 0.9], [0.06, 2.5, -0.08, 0.7],
-    [-0.15, 2.28, -0.28, 0.8], [0.18, 2.22, -0.3, 0.75],
+    [-0.2, 2.36, 0.32, 1.1], [0.22, 2.38, 0.28, 1], [-0.06, 2.5, 0.26, 0.85],
+    [0.28, 2.22, 0.3, 0.95], [-0.3, 2.22, 0.22, 1], [0.04, 2.52, 0.16, 0.8],
+    [-0.14, 2.28, 0.4, 0.9], [0.16, 2.26, 0.38, 0.85],
   ]) {
     const sp = new THREE.Mesh(spotGeo, spot);
     sp.position.set(x, y, z);
@@ -408,7 +412,8 @@ registerBuilding('policeStation', {
     roof.castShadow = true;
     roof.receiveShadow = true;
     g.add(roof);
-    mesh(g, new THREE.TorusGeometry(7.4, 0.45, 8, 28), grassDark, 0, hallH + 0.7, -3);
+    const trim = mesh(g, new THREE.TorusGeometry(7.4, 0.45, 8, 28), grassDark, 0, hallH + 0.7, -3);
+    trim.rotation.x = Math.PI / 2;
     const domeY = hallH + 0.75;
     const domeGlass = new THREE.Mesh(
       new THREE.SphereGeometry(6.15, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2),
