@@ -310,4 +310,8 @@ export const ANIMALS = [
   { type: 'dolphin', count: 3, near: 'south' },
   { type: 'dolphin', count: 3, near: 'west' },
   { type: 'dolphin', count: 3, near: 'pearl' },
+  // Highland woods only: west ridge, north meadow, east grove hills.
+  { type: 'tiger', count: 3, island: 'west' },
+  { type: 'tiger', count: 3, island: 'north' },
+  { type: 'tiger', count: 2, island: 'east' },
 ];

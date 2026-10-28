@@ -64,18 +64,26 @@ function markTexture() {
 }
 
 function nameTexture(name, nameEn) {
-  const c = makeCanvas(1280, 360);
+  const c = makeCanvas(1800, 420);
   const x = c.getContext('2d');
   x.fillStyle = '#f6f3ee';
-  x.fillRect(0, 0, 1280, 360);
-  x.fillStyle = '#1b1916';
+  x.fillRect(0, 0, 1800, 420);
   x.textAlign = 'left';
   x.textBaseline = 'middle';
-  x.font = `bold 188px ${CJK}`;
-  x.fillText(name, 36, 138);
+  x.fillStyle = '#1b1916';
+  x.font = `bold 176px ${CJK}`;
+  x.fillText(name, 28, 158);
   x.fillStyle = '#e25b1a';
-  x.font = 'bold 64px Arial, sans-serif';
-  x.fillText(String(nameEn || '').toUpperCase(), 40, 278);
+  x.font = 'bold 48px Arial, sans-serif';
+  x.fillText(String(nameEn || '').toUpperCase(), 32, 318);
+  x.fillStyle = '#ead8c4';
+  x.fillRect(980, 78, 5, 264);
+  x.fillStyle = '#1b1916';
+  x.font = `bold 132px ${CJK}`;
+  x.fillText('南瓜地铁', 1036, 145);
+  x.fillStyle = '#e25b1a';
+  x.font = 'italic 72px Arial, sans-serif';
+  x.fillText('in the ground', 1040, 292);
   return canvasTexture(c, { anisotropy: 8 });
 }
 
@@ -312,8 +320,8 @@ function header(g, ctx, mats, name, nameEn) {
   ring.position.z -= 0.01;
   g.add(ring);
   const tex = nameTexture(name, nameEn);
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(4.7, 1.05), signMaterial(ctx, tex));
-  face.position.set(0.85, 3.0, 2.58);
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(5.35, 1.25), signMaterial(ctx, tex));
+  face.position.set(0.72, 3.02, 2.58);
   g.add(face);
 }
 
