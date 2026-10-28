@@ -3,6 +3,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { makeCanvas, canvasTexture, textTexture } from '../core/Utils.js';
 import { curtainWallMaterial, sharedMaterial, colorMat, tiledBox, box, mesh, rod } from './materials.js';
+import { goldIngot } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -110,6 +111,7 @@ registerBuilding('fulaiTower', {
     ctx.nightMaterials.push({ material: beacon, intensity: 6, blink: true, always: true });
     mesh(g, new THREE.SphereGeometry(0.4, 10, 8), beacon, 0, peak + 14.3, 0, { cast: false });
 
+    goldIngot(g, 2.0, 0.36, 16.2);
     g.userData.treeSpots = [[-18, -18], [18, -18], [-18, 4], [18, 4], [-17, 18], [17, 18]];
     g.userData.height = peak + 14;
     return g;

@@ -2,6 +2,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { makeCanvas, canvasTexture } from '../core/Utils.js';
 import { windowWallMaterial, sharedMaterial, colorMat, box, tiledBox, mesh } from './materials.js';
+import { lobbyDuck } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -76,6 +77,7 @@ registerBuilding('homeInn', {
     for (const x of [-4, -1]) box(g, 1.8, 1, 1.4, x, H + 1.45, -5, sharedMaterial('concrete'));
     for (let i = 0; i < 5; i++) box(g, 0.12, 0.02, 4.6, 8 + i * 2.6, 0.27, 8.6, white, { cast: false });
 
+    lobbyDuck(g, 2.2, 0.02, 8.3).scale.setScalar(1.7);
     g.userData.treeSpots = [[-18, 8.5], [-12, 8.5]];
     g.userData.height = H + 5;
     return g;

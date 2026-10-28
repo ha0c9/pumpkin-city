@@ -4,6 +4,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { makeCanvas, canvasTexture, textTexture, mulberry32 } from '../core/Utils.js';
 import { curtainWallMaterial, sharedMaterial, colorMat, tiledBox, box, mesh, rod } from './materials.js';
+import { orrery } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -201,11 +202,13 @@ registerBuilding('planetarium', {
     // After dark the spheres turn deep navy so their star maps read like a night sky.
     const day = new THREE.Color(0xf2f5f8), night = new THREE.Color(0x101a30), obsDay = new THREE.Color(0xdfe6ee);
     const uNight = ctx.uniforms.uNight;
-    g.userData.animate = () => {
+    const sky = orrery(g, -22, 0.3, 19.0);
+    g.userData.animate = (t) => {
       const k = uNight.value;
       domeMat.color.copy(day).lerp(night, k);
       obsMat.color.copy(obsDay).lerp(night, k);
       domeMat.metalness = obsMat.metalness = 0.45 - 0.3 * k;
+      sky.userData.tick(t);
     };
 
     g.userData.treeSpots = [[-56, -17], [-40, -18], [-2, -18], [14, -18], [56, -17], [56, 17], [30, 17], [-56, 12]];

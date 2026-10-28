@@ -1,9 +1,10 @@
 // 南瓜岛动物城警察局 — a round sandstone hall with vertical ribs, a grass roof and a glass geodesic dome.
-// The street sign reads 南瓜岛动物城警察局 / Pumpkin Island Animal City Police Station.
+// The street sign reads 南瓜岛动物城警察局 / Pumpkin Island Zootopia Police Station.
 // The entrance sector is open so the curved reception desk and Officer Clawhauser are visible.
 import { registerBuilding } from '../core/Registry.js';
 import { makeCanvas, canvasTexture, mergeColored } from '../core/Utils.js';
 import { colorMat, sharedMaterial, box, mesh, tiledBox } from './materials.js';
+import { donutBox } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -20,15 +21,17 @@ function stationSign() {
   x.fillStyle = '#f6efe4';
   x.textAlign = 'center';
   x.textBaseline = 'middle';
-  x.font = `bold 68px ${CJK}`;
-  x.fillText('南瓜岛动物城警察局', 512, 96);
-  x.font = 'bold 32px "Helvetica Neue",Arial,sans-serif';
-  x.fillText('Pumpkin Island Animal City Police Station', 512, 172);
+  x.font = `bold 64px ${CJK}`;
+  x.fillText('南瓜岛动物城警察局', 512, 64);
+  x.font = 'bold 28px Arial, sans-serif';
+  x.fillText('Pumpkin Island Zootopia Police Station', 512, 118);
   return canvasTexture(c, { anisotropy: 8 });
 }
 
-/** Round lobby badge: 动物城警察, not a trademark English name. */
+/** Round badge shared by the lobby pillar and the front door. */
+let cachedBadge = null;
 function badgeTexture() {
+  if (cachedBadge) return cachedBadge;
   const c = makeCanvas(512, 512);
   const x = c.getContext('2d');
   x.beginPath();
@@ -64,9 +67,10 @@ function badgeTexture() {
   x.textBaseline = 'middle';
   x.font = `bold 52px ${CJK}`;
   x.fillText('动物城警察', 256, 278);
-  x.font = '22px "Helvetica Neue",Arial,sans-serif';
-  x.fillText('Animal City Police', 256, 332);
-  return canvasTexture(c, { anisotropy: 4 });
+  x.font = '22px Arial, sans-serif';
+  x.fillText('Zootopia Police', 256, 332);
+  cachedBadge = canvasTexture(c, { anisotropy: 4 });
+  return cachedBadge;
 }
 
 /** Upper-hemisphere icosahedron edges, packed into one strut mesh. */
@@ -174,6 +178,8 @@ function addLobby(g, ctx) {
     const a = (i / 4) * Math.PI * 2;
     mesh(g, new THREE.SphereGeometry(0.035, 6, 4), colorMat(col, { roughness: 0.4 }), jx + Math.cos(a) * 0.04, 1.46, jz + Math.sin(a) * 0.04, { cast: false });
   });
+  const [dx0, dz0] = onArc(0.2, 3.28);
+  donutBox(g, dx0, 1.38, dz0, -0.2);
 
   const orange = colorMat(0xe08a42, { roughness: 0.78 });
   box(g, 1.75, 6.5, 1.45, 0, 3.45, 0.05, orange);
@@ -333,7 +339,7 @@ registerBuilding('policeStation', {
     featured: true,
     category: '警察局 Police Station',
     name: '南瓜岛动物城警察局',
-    nameEn: 'Pumpkin Island Animal City Police Station',
+    nameEn: 'Pumpkin Island Zootopia Police Station',
   }),
   create(ctx) {
     const g = new THREE.Group();
@@ -455,6 +461,16 @@ registerBuilding('policeStation', {
     });
     box(g, 1.2, 3.15, 0.08, -1.9, 1.9, 13.48, doorGlass, { cast: false });
     box(g, 1.2, 3.15, 0.08, 1.9, 1.9, 13.48, doorGlass, { cast: false });
+    const peg = colorMat(0xf0c14d, { roughness: 0.35, metalness: 0.65 });
+    box(g, 1.05, 1.05, 0.06, -1.85, 2.55, 13.7, peg, { cast: false });
+    const doorBadgeTex = badgeTexture();
+    const doorBadgeMat = new THREE.MeshStandardMaterial({
+      map: doorBadgeTex, emissive: 0xffffff, emissiveMap: doorBadgeTex, emissiveIntensity: 0.4, roughness: 0.4,
+    });
+    ctx.nightMaterials.push({ material: doorBadgeMat, intensity: 0.85, base: 0.4 });
+    const doorBadge = new THREE.Mesh(new THREE.CircleGeometry(0.48, 28), doorBadgeMat);
+    doorBadge.position.set(-1.85, 2.55, 13.78);
+    g.add(doorBadge);
     const signTex = stationSign();
     const signMat = new THREE.MeshStandardMaterial({
       map: signTex, emissive: 0xffffff, emissiveMap: signTex, emissiveIntensity: 0.18, roughness: 0.55,

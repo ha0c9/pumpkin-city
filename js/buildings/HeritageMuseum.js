@@ -2,6 +2,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { textTexture, mergeSimple } from '../core/Utils.js';
 import { windowWallMaterial, sharedMaterial, box, tiledBox } from './materials.js';
+import { porcelainVase } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -117,6 +118,7 @@ registerBuilding('heritageMuseum', {
     // Hedges along the plaza.
     for (const x of [-14.5, 14.5]) tiledBox(g, 1.4, 1.0, 6.5, x, 0.8, 13.8, sharedMaterial('hedge'), 0.5);
 
+    porcelainVase(g, 3.6, 1.9, 5.8).scale.setScalar(1.45);
     g.userData.treeSpots = [[-15, -14], [15, -14], [-15, 1], [15, 1], [-10, 16.5], [10, 16.5]];
     g.userData.height = 24;
     return g;

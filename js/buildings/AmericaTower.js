@@ -2,6 +2,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { textTexture } from '../core/Utils.js';
 import { curtainWallMaterial, sharedMaterial, box, tiledBox } from './materials.js';
+import { coffeeAndPlant } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -110,6 +111,7 @@ registerBuilding('americaTower', {
     mono.position.set(-13.5, 1.15, 16.02);
     g.add(mono);
 
+    coffeeAndPlant(g, 3.4, 0.3, 16.0).scale.setScalar(1.6);
     g.userData.treeSpots = [[-16.2, -12], [16.2, -12], [-16.2, -3], [16.2, -3], [-16.2, 6], [16.2, 6], [13.5, 15.6]];
     g.userData.height = yc + 26;
     return g;

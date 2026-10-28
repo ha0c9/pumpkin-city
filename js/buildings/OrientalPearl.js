@@ -3,6 +3,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { makeCanvas, canvasTexture, textTexture } from '../core/Utils.js';
 import { curtainWallMaterial, sharedMaterial, colorMat, tiledBox, box, mesh, rod } from './materials.js';
+import { pearlOnCushion } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -93,6 +94,7 @@ registerBuilding('orientalPearl', {
     mesh(g, new THREE.PlaneGeometry(8.4, 1.6), new THREE.MeshStandardMaterial({ map: signTex, transparent: true }), 0, 1.25, 31.52, { cast: false });
 
     // Night show: the pearls slowly cycle through pink, violet and gold.
+    pearlOnCushion(g, 6.5, 0.32, 22).scale.setScalar(1.6);
     const hsl = new THREE.Color();
     g.userData.animate = (t) => {
       const k = (Math.sin(t * 0.35) * 0.5 + 0.5);

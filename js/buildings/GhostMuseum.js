@@ -2,6 +2,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { textTexture, makeCanvas, canvasTexture, mulberry32 } from '../core/Utils.js';
 import { sharedMaterial, colorMat, box, mesh } from './materials.js';
+import { porchCat } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -167,6 +168,7 @@ registerBuilding('ghostMuseum', {
       }
     };
 
+    porchCat(g, 4.6, 0.32, 17.4).scale.setScalar(2);
     g.userData.height = top;
     g.userData.treeSpots = [[-21, -21], [21, -21], [-21, 8], [21, 8]];
     return g;

@@ -116,8 +116,8 @@ export const LANDMARKS = [
   },
   {
     type: 'policeStation', id: 'zootopia-police',
-    name: '南瓜岛动物城警察局', nameEn: 'Pumpkin Island Animal City Police Station',
-    description: '武夷路南侧的圆厅警察局：暖色石砌墙、竖向壁柱、草地屋顶和玻璃网格穹顶。门楣写着南瓜岛动物城警察局。大厅里有弧形接待台和豹警官，门口台阶通向广场，巡逻警车从这里出发。',
+    name: '南瓜岛动物城警察局', nameEn: 'Pumpkin Island Zootopia Police Station',
+    description: '武夷路南侧的圆厅警察局：暖色石砌墙、竖向壁柱、草地屋顶和玻璃网格穹顶。门楣写着南瓜岛动物城警察局，前门挂着圆形警徽。大厅里有弧形接待台、一盒甜甜圈和豹警官，门口台阶通向广场，巡逻警车从这里出发。',
     position: [112, 100], rotation: PI,
   },
   {

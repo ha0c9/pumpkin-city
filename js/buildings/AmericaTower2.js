@@ -3,6 +3,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { textTexture, makeCanvas, canvasTexture } from '../core/Utils.js';
 import { curtainWallMaterial, sharedMaterial, colorMat, box, tiledBox, mesh } from './materials.js';
+import { luggageCart } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -129,6 +130,7 @@ registerBuilding('americaTower2', {
       }
     }
 
+    luggageCart(g, -4.2, 0.42, 14.6, 0.35);
     g.userData.treeSpots = [[-16.5, -14], [16.5, -14], [-16.5, -2], [16.5, -2], [-16.5, 9], [-13, 15.6]];
     g.userData.height = yTop + 8;
     return g;

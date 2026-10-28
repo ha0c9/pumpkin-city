@@ -2,6 +2,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { textTexture, makeCanvas, canvasTexture, mergeSimple } from '../core/Utils.js';
 import { windowWallMaterial, sharedMaterial, colorMat, box, tiledBox, mesh } from './materials.js';
+import { libertyTorch } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -140,6 +141,7 @@ registerBuilding('americaMuseum', {
       }
     }
 
+    libertyTorch(g, 3.0, 2.22, 5.0).scale.setScalar(1.35);
     g.userData.treeSpots = [[-23, -18], [23, -18], [-23, 4], [23, 4], [-12, 19.5], [12, 19.5]];
     g.userData.height = 33;
     return g;

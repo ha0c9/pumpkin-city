@@ -3,6 +3,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { textTexture, makeCanvas, canvasTexture, mulberry32 } from '../core/Utils.js';
 import { curtainWallMaterial, windowWallMaterial, sharedMaterial, colorMat, box, tiledBox, mesh, rod } from './materials.js';
+import { grandPiano } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -247,6 +248,7 @@ registerBuilding('fourSeasons', {
     balloons.position.set(-4, 0, 38);
     g.add(balloons);
 
+    grandPiano(g, -3.2, 0.32, -16.5, 0.5);
     g.userData.animate = (t) => {
       animWheel(t); animCarousel(t); animCoaster(t);
       balloons.rotation.y = Math.sin(t * 0.6) * 0.2;

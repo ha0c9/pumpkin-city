@@ -5,6 +5,7 @@ import { registerBuilding } from '../core/Registry.js';
 import { textTexture, makeCanvas, canvasTexture, rodMatrix, instancedFrom } from '../core/Utils.js';
 import { trackTexture } from '../core/Textures.js';
 import { windowWallMaterial, sharedMaterial, colorMat, box, tiledBox, mesh } from './materials.js';
+import { teachersApple } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -250,6 +251,7 @@ registerBuilding('school', {
     }
     g.add(instancedFrom(new THREE.CylinderGeometry(1, 1, 1, 6), sharedMaterial('darkSteel'), posts, { castShadow: false }));
 
+    teachersApple(g, -7.0, 1.19, 26.2).scale.setScalar(1.8);
     g.userData.treeSpots = [[-21, -12], [-21, 9], [-21, 24], [21, 0], [21, 24], [12, 26], [-5, -13.5], [3, -13.5], [-21, -26.5], [21, -26.5]];
     g.userData.height = 24;
     return g;

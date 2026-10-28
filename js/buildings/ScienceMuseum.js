@@ -3,6 +3,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { textTexture, mergeSimple } from '../core/Utils.js';
 import { curtainWallMaterial, sharedMaterial, colorMat, box, tiledBox, mesh, rod } from './materials.js';
+import { atomMobile } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -109,10 +110,13 @@ registerBuilding('scienceMuseum', {
       }
     }
 
+    const atom = atomMobile(g, 0, 1.7, 24.7);
+    atom.scale.setScalar(1.25);
     g.userData.animate = (t) => {
       rings[0].rotation.y = t * 0.25;
       rings[1].rotation.y = -t * 0.18;
       rings[2].rotation.y = t * 0.12;
+      atom.userData.tick(t);
     };
     g.userData.treeSpots = [[-27, -27], [27, -27], [-27, 27], [-27, 0], [27, 0]];
     g.userData.height = sphereY + 15;

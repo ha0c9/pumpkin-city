@@ -4,6 +4,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { makeCanvas, canvasTexture } from '../core/Utils.js';
 import { sharedMaterial, colorMat, box, tiledBox, mesh, rod } from './materials.js';
+import { pastaBowl } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -119,6 +120,7 @@ export function buildRestaurant(ctx) {
 
   const ground = [[0.3, -1.35], [2.6, -1.35], [0.3, 1.15], [2.6, 1.15]];
   for (const [x, z] of ground) table(g, x, 0.26, z, stairMat, cloth, chair);
+  pastaBowl(g, 2.6, 1.08, 1.28).scale.setScalar(2.3);
   const upper = [[-0.4, -1.2], [2.2, -1.2], [0.9, 1.15]];
   for (const [x, z] of upper) table(g, x, floorH + 0.28, z, stairMat, cloth, chair);
 
