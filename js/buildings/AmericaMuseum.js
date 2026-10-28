@@ -2,6 +2,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { textTexture, makeCanvas, canvasTexture, mergeSimple } from '../core/Utils.js';
 import { windowWallMaterial, sharedMaterial, colorMat, box, tiledBox, mesh } from './materials.js';
+import { libertyTorch, secretRoom, libertyBell, markInterior } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -29,25 +30,45 @@ function gable(w, d, h) {
   return g;
 }
 
-function hall(ctx, g, w, h, d, x, z, floors, seed) {
+function hall(ctx, g, w, h, d, x, z, floors, seed, opening) {
   const front = windowWallMaterial(ctx, { cols: Math.round(w / 3.2), rows: floors, wall: 'brick', frame: '#f6f3ea', glass: '#2f3e4c', seed, winW: 0.46, winH: 0.62, litRatio: 0.55 });
   const side = windowWallMaterial(ctx, { cols: Math.round(d / 3.2), rows: floors, wall: 'brick', frame: '#f6f3ea', glass: '#2f3e4c', seed: seed + 1, winW: 0.46, winH: 0.62, litRatio: 0.55 });
   for (const m of [front, side]) m.color.set(0xd8a090);
   const roof = sharedMaterial('roof');
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), [side, side, roof, roof, front, front]);
-  m.position.set(x, 1.2 + h / 2, z);
-  m.castShadow = true; m.receiveShadow = true;
-  g.add(m);
   const white = sharedMaterial('white');
-  box(g, w + 0.6, 0.9, d + 0.6, x, 1.2 + h + 0.45, z, white);  // cornice
-  box(g, w + 0.3, 0.35, d + 0.3, x, 1.2 + h * 0.5, z, white);  // string course
-  return m;
+  const y0 = 1.2;
+  if (!opening) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), [side, side, roof, roof, front, front]);
+    m.position.set(x, y0 + h / 2, z);
+    m.castShadow = true; m.receiveShadow = true;
+    g.add(m);
+  } else {
+    front.side = THREE.DoubleSide;
+    side.side = THREE.DoubleSide;
+    const T = 0.42;
+    const yc = y0 + h / 2;
+    const doorW = opening.w;
+    const doorH = opening.h;
+    box(g, T, h, d, x - w / 2, yc, z, side);
+    box(g, T, h, d, x + w / 2, yc, z, side);
+    box(g, w, h, T, x, yc, z - d / 2, front);
+    const frontZ = z + d / 2;
+    const sideW = (w - doorW) / 2;
+    box(g, sideW, h, T, x - w / 2 + sideW / 2, yc, frontZ, front);
+    box(g, sideW, h, T, x + w / 2 - sideW / 2, yc, frontZ, front);
+    box(g, doorW, h - doorH, T, x, y0 + doorH + (h - doorH) / 2, frontZ, front);
+    const plaster = new THREE.MeshStandardMaterial({ color: 0xf3efe6, roughness: 0.86, side: THREE.DoubleSide });
+    box(g, w - 1.2, 0.1, d - 1.2, x, y0 + 0.08, z, plaster, { cast: false });
+    box(g, w - 1.2, 0.22, d - 1.2, x, y0 + h - 0.14, z, roof, { cast: false });
+  }
+  box(g, w + 0.6, 0.9, d + 0.6, x, y0 + h + 0.45, z, white);  // cornice
+  box(g, w + 0.3, 0.35, d + 0.3, x, y0 + h * 0.5, z, white);  // string course
 }
 
 registerBuilding('americaMuseum', {
   label: '博物馆 Museum',
   footprint: [52, 42],
-  create(ctx) {
+  create(ctx, spec) {
     const g = new THREE.Group();
     const white = sharedMaterial('white');
     const slate = colorMat(0x4a4f57, { roughness: 0.75 });
@@ -58,7 +79,7 @@ registerBuilding('americaMuseum', {
 
     // Raised basement + main block + wings.
     tiledBox(g, 46, 1.2, 22, 0, 0.6, -6, sharedMaterial('stoneDark'), 0.25);
-    hall(ctx, g, 26, 13, 18, 0, -6, 3, 71);
+    hall(ctx, g, 26, 13, 18, 0, -6, 3, 71, { w: 3.4, h: 3.5 });
     for (const sx of [-1, 1]) hall(ctx, g, 10, 9, 15, sx * 17.5, -6, 2, 73 + sx);
     const mainRoof = mesh(g, gable(26.6, 18.6, 5.2), slate, 0, 14.6, -6);
     mainRoof.castShadow = true;
@@ -94,7 +115,9 @@ registerBuilding('americaMuseum', {
     // Front door with fanlight, warm at night.
     const door = new THREE.MeshStandardMaterial({ color: 0x223a2e, roughness: 0.5, emissive: 0xffc77a, emissiveIntensity: 0 });
     ctx.nightMaterials.push({ material: door, intensity: 0.5 });
-    box(g, 3, 4.6, 0.3, 0, 2.2 + 2.3, 3.05, door);
+    box(g, 0.28, 3.5, 0.45, -1.85, 1.2 + 1.75, 3.2, door);
+    box(g, 0.28, 3.5, 0.45, 1.85, 1.2 + 1.75, 3.2, door);
+    box(g, 4.0, 0.28, 0.45, 0, 1.2 + 3.64, 3.2, door);
     const fan = mesh(g, new THREE.CircleGeometry(1.5, 20, 0, Math.PI), door, 0, 6.8, 3.22);
     fan.castShadow = false;
 
@@ -140,6 +163,18 @@ registerBuilding('americaMuseum', {
       }
     }
 
+    libertyTorch(g, 3.0, 2.22, 5.0).scale.setScalar(1.35);
+    // Side gallery inside the main hall. The bell is off the front-door axis.
+    secretRoom(g, -3.4, 1.28, -6.4, Math.PI / 2, {
+      wall: 0xf6f1e6, floor: 0xd9c7a4, trim: 0x6b4a2b,
+      width: 5.2, depth: 3.8, height: 3.2,
+      sign: ['展厅', 'GALLERY'],
+      furnish(room, spot) { libertyBell(room, spot.x, spot.y, spot.z).scale.setScalar(1.75); },
+    });
+    markInterior(ctx, spec, [
+      [0, 12, 8, 34],
+      [-5.4, -6.4, 8, 6],
+    ]);
     g.userData.treeSpots = [[-23, -18], [23, -18], [-23, 4], [23, 4], [-12, 19.5], [12, 19.5]];
     g.userData.height = 33;
     return g;

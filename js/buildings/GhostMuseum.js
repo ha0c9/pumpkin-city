@@ -2,6 +2,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { textTexture, makeCanvas, canvasTexture, mulberry32 } from '../core/Utils.js';
 import { sharedMaterial, colorMat, box, mesh } from './materials.js';
+import { porchCat, secretRoom, crystalBall, entranceFrame, markInterior } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -167,6 +168,15 @@ registerBuilding('ghostMuseum', {
       }
     };
 
+    porchCat(g, 4.6, 0.32, 17.4).scale.setScalar(2);
+    entranceFrame(g, 0, 8.75, '降灵室', 0x2a2428);
+    secretRoom(g, -1.15, 0.34, 8.15, 0, {
+      wall: 0x24182a, floor: 0x1a1420, trim: 0x3dffb0,
+      width: 6.4, depth: 3.6, height: 2.2,
+      sign: ['降灵室', 'SEANCE'],
+      furnish(room, spot) { crystalBall(room, spot.x, spot.y, spot.z).scale.setScalar(1.15); },
+    });
+    markInterior(ctx, spec, [[-1.1, 11, 8, 12]]);
     g.userData.height = top;
     g.userData.treeSpots = [[-21, -21], [21, -21], [-21, 8], [21, 8]];
     return g;

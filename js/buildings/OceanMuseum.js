@@ -2,6 +2,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { textTexture, makeCanvas, canvasTexture } from '../core/Utils.js';
 import { windowWallMaterial, sharedMaterial, colorMat, box, tiledBox, mesh, rod } from './materials.js';
+import { divingHelmet } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -151,6 +152,7 @@ registerBuilding('oceanMuseum', {
     const tailMesh = mesh(g, new THREE.ExtrudeGeometry(tail, { depth: 0.8, bevelEnabled: true, bevelSize: 0.25, bevelThickness: 0.25, bevelSegments: 2 }), colorMat(0x3c5a73, { roughness: 0.35, metalness: 0.3 }), -34.5, 0.4, -2);
     tailMesh.rotation.y = Math.PI / 2;
 
+    divingHelmet(g, 16.5, 10.4, 3.2, 0.6).scale.setScalar(1.8);
     g.userData.treeSpots = [];
     g.userData.height = 24;
     return g;

@@ -4,6 +4,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { makeCanvas, canvasTexture } from '../core/Utils.js';
 import { sharedMaterial, colorMat, box, tiledBox, mesh, rod } from './materials.js';
+import { pastaBowl, secretRoom, pantryShelf, markInterior } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -45,7 +46,7 @@ function table(g, x, y, z, wood, cloth, chair) {
   mesh(g, new THREE.CylinderGeometry(0.16, 0.16, 0.03, 12), cloth, x + 0.22, y + 0.84, z);
 }
 
-export function buildRestaurant(ctx) {
+export function buildRestaurant(ctx, spec) {
   const g = new THREE.Group();
   const W = 11, D = 7.4, floorH = 3.15;
   const wall = colorMat(0xf4efe6, { roughness: 0.7 });
@@ -117,8 +118,22 @@ export function buildRestaurant(ctx) {
   box(g, 5.2, 0.9, 0.55, 1.6, 0.7, -D / 2 + 0.55, trim);
   box(g, 5.2, 0.08, 0.5, 1.6, 1.18, -D / 2 + 0.55, cloth);
 
-  const ground = [[0.3, -1.35], [2.6, -1.35], [0.3, 1.15], [2.6, 1.15]];
+  const ground = [[0.3, -1.35], [1.55, -1.35], [0.3, 1.15], [2.6, 1.15]];
   for (const [x, z] of ground) table(g, x, 0.26, z, stairMat, cloth, chair);
+  pastaBowl(g, 2.6, 1.08, 1.28).scale.setScalar(2.3);
+  // Opaque kitchen on the right. The door faces the dining room; the pumpkin
+  // and the recipe sit in the alcove, off the street sightline.
+  secretRoom(g, 3.05, 0.26, -0.95, -Math.PI / 2, {
+    wall: 0xf6efe4, floor: 0x8d5a32, trim: 0x5c3318,
+    width: 3.8, depth: 2.25, height: 2.85,
+    sign: ['后厨', 'KITCHEN'],
+    furnish(room, spot) { pantryShelf(room, spot.x, spot.y, spot.z).scale.setScalar(1.45); },
+  });
+  markInterior(ctx, spec, [
+    [0.4, 1.2, 12, 9],
+    [1.2, 6.4, 7, 6],
+    [4.15, -0.95, 2.6, 4.2],
+  ]);
   const upper = [[-0.4, -1.2], [2.2, -1.2], [0.9, 1.15]];
   for (const [x, z] of upper) table(g, x, floorH + 0.28, z, stairMat, cloth, chair);
 
@@ -176,7 +191,7 @@ registerBuilding('restaurant', {
     return {
       category: '意面馆 Pasta',
       name: '南瓜大道意面馆', nameEn: 'Pumpkin Avenue Pasta',
-      description: '两层意面馆。一楼和二楼都摆着餐桌，左墙的楼梯通到二楼，临街两面是玻璃，从外面就能看见里面。',
+      description: '两层意面馆。一楼和二楼都摆着餐桌，左墙的楼梯通到二楼，临街是玻璃。一楼右侧后厨从街上只能看见门，走进去才看得到南瓜和酱料。',
       featured: true,
     };
   },

@@ -2,6 +2,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { textTexture } from '../core/Utils.js';
 import { sharedMaterial, colorMat, box, tiledBox, mesh } from './materials.js';
+import { galleryEasel } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -78,6 +79,7 @@ registerBuilding('oceanGallery', {
     g.add(fish);
     for (const x of [8.8, 11.2]) mesh(g, new THREE.CylinderGeometry(0.08, 0.08, 2.2, 6), sharedMaterial('steel'), x, 1.6, 12.5);
 
+    galleryEasel(g, 6.2, 1.64, 6.4, 0.2).scale.setScalar(1.7);
     g.userData.treeSpots = [[-18, -15], [18, -15], [-18, 6], [18, 6]];
     g.userData.height = 18;
     return g;

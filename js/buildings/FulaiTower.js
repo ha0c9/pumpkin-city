@@ -3,6 +3,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { makeCanvas, canvasTexture, textTexture } from '../core/Utils.js';
 import { curtainWallMaterial, sharedMaterial, colorMat, tiledBox, box, mesh, rod } from './materials.js';
+import { goldIngot, secretRoom, vaultHoard, markInterior } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -33,7 +34,7 @@ function octPrism(g, r, h, y, twist, wall, roof) {
 registerBuilding('fulaiTower', {
   label: '超高层 Skyscraper',
   footprint: [40, 40],
-  create(ctx) {
+  create(ctx, spec) {
     const g = new THREE.Group();
     const gold = colorMat(0xc9a14a, { roughness: 0.28, metalness: 0.9 });
     const roof = sharedMaterial('roof');
@@ -110,6 +111,15 @@ registerBuilding('fulaiTower', {
     ctx.nightMaterials.push({ material: beacon, intensity: 6, blink: true, always: true });
     mesh(g, new THREE.SphereGeometry(0.4, 10, 8), beacon, 0, peak + 14.3, 0, { cast: false });
 
+    goldIngot(g, 2.0, 0.36, 16.2);
+    // Vault sits inside the solid podium, behind the lobby doors.
+    secretRoom(g, -1.44, 0.36, 14.85, 0, {
+      wall: 0xf6efe4, floor: 0x8d6a32, trim: 0xc9a14a,
+      width: 8, depth: 5.2, height: 4.1,
+      sign: ['金库', 'VAULT'],
+      furnish(room, spot) { vaultHoard(room, spot.x, spot.y, spot.z).scale.setScalar(1.45); },
+    });
+    markInterior(ctx, spec, [[-1.4, 16.5, 8, 12]]);
     g.userData.treeSpots = [[-18, -18], [18, -18], [-18, 4], [18, 4], [-17, 18], [17, 18]];
     g.userData.height = peak + 14;
     return g;

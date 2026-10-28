@@ -4,6 +4,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { textTexture } from '../core/Utils.js';
 import { windowWallMaterial, sharedMaterial, colorMat, box, tiledBox, mesh, rod } from './materials.js';
+import { toyRobot } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -131,6 +132,7 @@ export function buildFactory(ctx, spec) {
   box(g, 1.3, 1.1, 1.3, hx - 10, 1.7, hz + hallD / 2 + 3, colorMat(0x8a6238, { roughness: 0.8 }));
   box(g, 1.1, 0.9, 1.1, hx - 8.4, 1.6, hz + hallD / 2 + 3.4, colorMat(0x6e5130, { roughness: 0.8 }));
 
+  toyRobot(g, 13.2, 0.24, 15.05, 0.15).scale.setScalar(1.5);
   g.userData.height = 18;
   g.userData.treeSpots = [];
   return g;

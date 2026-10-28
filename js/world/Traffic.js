@@ -320,7 +320,7 @@ export class Traffic {
         } : {
           id: `car-${type}-${i}`, name: def.name, nameEn: def.nameEn, category: '交通 Traffic',
           description: type === 'police'
-            ? '祖托皮亚警察局的巡逻车：白车身、蓝条纹和车顶警灯，沿南瓜中心岛的街道巡逻，也会过桥但会绕回来。'
+            ? '南瓜岛动物城警察局的巡逻车：白车身、蓝条纹和车顶警灯，沿南瓜中心岛的街道巡逻，也会过桥但会绕回来。'
             : '行驶在南瓜岛道路上的车辆，遵守红绿灯并保持车距。',
         });
       }

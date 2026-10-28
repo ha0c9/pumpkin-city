@@ -4,6 +4,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { makeCanvas, canvasTexture, textTexture, mulberry32 } from '../core/Utils.js';
 import { curtainWallMaterial, sharedMaterial, colorMat, tiledBox, box, mesh, rod } from './materials.js';
+import { orrery, secretRoom, starProjector, markInterior } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -121,7 +122,7 @@ function geodesic(g, r, x, y, z, material, lineMat) {
 registerBuilding('planetarium', {
   label: '天文馆 Planetarium',
   footprint: [116, 40],
-  create(ctx) {
+  create(ctx, spec) {
     const g = new THREE.Group();
     const steel = sharedMaterial('steel');
     const darkSteel = sharedMaterial('darkSteel');
@@ -201,11 +202,21 @@ registerBuilding('planetarium', {
     // After dark the spheres turn deep navy so their star maps read like a night sky.
     const day = new THREE.Color(0xf2f5f8), night = new THREE.Color(0x101a30), obsDay = new THREE.Color(0xdfe6ee);
     const uNight = ctx.uniforms.uNight;
-    g.userData.animate = () => {
+    const sky = orrery(g, -22, 0.3, 19.0);
+    // Dome hall inside the shell, just behind the entrance portal.
+    secretRoom(g, -19.44, 0.32, 13.45, 0, {
+      wall: 0x1b2733, floor: 0x243044, trim: 0x9fc8ff,
+      width: 8, depth: 4.8, height: 4.2,
+      sign: ['球幕厅', 'DOME'],
+      furnish(room, spot) { starProjector(room, spot.x, spot.y, spot.z).scale.setScalar(1.45); },
+    });
+    markInterior(ctx, spec, [[-19.4, 15.5, 10, 12]]);
+    g.userData.animate = (t) => {
       const k = uNight.value;
       domeMat.color.copy(day).lerp(night, k);
       obsMat.color.copy(obsDay).lerp(night, k);
       domeMat.metalness = obsMat.metalness = 0.45 - 0.3 * k;
+      sky.userData.tick(t);
     };
 
     g.userData.treeSpots = [[-56, -17], [-40, -18], [-2, -18], [14, -18], [56, -17], [56, 17], [30, 17], [-56, 12]];

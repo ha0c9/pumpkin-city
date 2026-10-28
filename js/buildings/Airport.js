@@ -7,6 +7,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { textTexture } from '../core/Utils.js';
 import { curtainWallMaterial, sharedMaterial, colorMat, box, tiledBox, mesh } from './materials.js';
+import { arrivalNook } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -267,6 +268,7 @@ function terminal(ctx, g, cx, cz, title, mats, elevators) {
   mesh(g, gable, mats.vault, cx + W / 2 - 0.02, 0, cz, { cast: false });
 
   addElevators(g, cx - W / 2, cz, FH, springY, mats, elevators);
+  if (String(title).startsWith('1')) arrivalNook(g, cx - 28, 0.32, cz + D / 2 + 1.05);
   return { D, floorY: FH + 0.2 };
 }
 

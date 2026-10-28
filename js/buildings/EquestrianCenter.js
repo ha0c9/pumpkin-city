@@ -3,6 +3,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { textTexture } from '../core/Utils.js';
 import { windowWallMaterial, sharedMaterial, colorMat, box, tiledBox, mesh, rod } from './materials.js';
+import { prizeRibbon } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -219,6 +220,7 @@ export function buildEquestrianCenter(ctx) {
     horse.scale.set(0.92, 0.92, 0.92);
   }
 
+  prizeRibbon(g, -13, 1.9, -12.02).scale.setScalar(1.6);
   g.userData.animate = (t) => {
     for (const p of ponies) {
       const u = t * p.speed + p.phase;

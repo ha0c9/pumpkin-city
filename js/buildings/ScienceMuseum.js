@@ -3,13 +3,14 @@
 import { registerBuilding } from '../core/Registry.js';
 import { textTexture, mergeSimple } from '../core/Utils.js';
 import { curtainWallMaterial, sharedMaterial, colorMat, box, tiledBox, mesh, rod } from './materials.js';
+import { atomMobile, secretRoom, labBench, markInterior } from './easterEggs.js';
 
 const THREE = window.THREE;
 
 registerBuilding('scienceMuseum', {
   label: '科技馆 Science Museum',
   footprint: [60, 60],
-  create(ctx) {
+  create(ctx, spec) {
     const g = new THREE.Group();
     const chrome = new THREE.MeshStandardMaterial({ color: 0xe8edf2, metalness: 1, roughness: 0.08, envMapIntensity: 1.6 });
     const led = new THREE.MeshStandardMaterial({ color: 0x0b2a3a, emissive: 0x38d9ff, emissiveIntensity: 0.6, roughness: 0.3 });
@@ -35,6 +36,9 @@ registerBuilding('scienceMuseum', {
     const N = 72;
     for (let i = 0; i < N; i++) {
       const a = i / N * Math.PI * 2;
+      const fx = Math.cos(a), fz = Math.sin(a);
+      // Leave the street entrance clear for the walk-in lab lobby.
+      if (fz > 0.94 && Math.abs(fx) < 0.32) continue;
       const h = hallH + 2 + Math.sin(a * 3) * 2.5 + Math.sin(a * 5 + 1) * 1.2;
       const fin = new THREE.BoxGeometry(0.35, h, 2.4);
       fin.rotateY(-a);
@@ -42,8 +46,16 @@ registerBuilding('scienceMuseum', {
       finParts.push(fin);
     }
     mesh(g, mergeSimple(finParts), white);
-    // Entrance cut into the fins (front, +Z).
-    box(g, 10, 4.5, 4, 0, 2.55, R + 1.2, colorMat(0x1b2733, { roughness: 0.3, metalness: 0.6 }));
+    // Entrance lobby. The beaker is in the left alcove, off the doorway.
+    secretRoom(g, 0, 0.28, 22.9, 0, {
+      wall: 0x1b2733, floor: 0x243044, trim: 0x7fd4ff,
+      width: 8.4, depth: 2.35, height: 4.05,
+      sign: ['实验室', 'LAB'],
+      furnish(room, spot) { labBench(room, spot.x, spot.y, spot.z).scale.setScalar(1.75); },
+    });
+    markInterior(ctx, spec, [
+      [0, 26, 12, 20],
+    ]);
     box(g, 11, 0.5, 6, 0, 5, R + 2.2, white);
     box(g, 9.6, 0.15, 0.1, 0, 4.6, R + 3.2, led, { cast: false });
 
@@ -109,10 +121,13 @@ registerBuilding('scienceMuseum', {
       }
     }
 
+    const atom = atomMobile(g, 0, 1.7, 24.7);
+    atom.scale.setScalar(1.25);
     g.userData.animate = (t) => {
       rings[0].rotation.y = t * 0.25;
       rings[1].rotation.y = -t * 0.18;
       rings[2].rotation.y = t * 0.12;
+      atom.userData.tick(t);
     };
     g.userData.treeSpots = [[-27, -27], [27, -27], [-27, 27], [-27, 0], [27, 0]];
     g.userData.height = sphereY + 15;

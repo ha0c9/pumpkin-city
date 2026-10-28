@@ -5,6 +5,7 @@ import { registerBuilding } from '../core/Registry.js';
 import { textTexture, makeCanvas, canvasTexture, rodMatrix, instancedFrom } from '../core/Utils.js';
 import { trackTexture } from '../core/Textures.js';
 import { windowWallMaterial, sharedMaterial, colorMat, box, tiledBox, mesh } from './materials.js';
+import { teachersApple, classHamster, markInterior } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -97,7 +98,7 @@ function trackShape(w, r) {
 registerBuilding('school', {
   label: '学校 School',
   footprint: [46, 58],
-  create(ctx) {
+  create(ctx, spec) {
     const g = new THREE.Group();
     const white = sharedMaterial('white');
     const floorH = 3.6;
@@ -212,14 +213,37 @@ registerBuilding('school', {
     const gh = new THREE.Group();
     const ghW = 6, ghD = 4, ghH = 3.2;
     const ghWall = colorMat(0xf2efe6, { roughness: 0.6 });
-    box(gh, ghW, ghH, ghD, 0, ghH / 2 + 0.1, 0, ghWall);
+    const shell = ghWall.clone();
+    shell.side = THREE.DoubleSide;
+    const y0 = 0.1;
+    const mid = y0 + ghH / 2;
+    const t = 0.16;
+    const doorW = 1.2;
+    const doorH = 2.3;
+    const doorX = -1.6;
+    box(gh, ghW - 0.08, 0.08, ghD - 0.08, 0, y0 + 0.04, 0, shell, { cast: false });
+    box(gh, ghW - 0.2, 0.08, ghD - 0.2, 0, y0 + ghH - 0.1, 0, shell, { cast: false });
+    box(gh, ghW, ghH, t, 0, mid, ghD / 2, shell);
+    box(gh, t, ghH, ghD, -ghW / 2, mid, 0, shell);
+    box(gh, t, ghH, ghD, ghW / 2, mid, 0, shell);
+    const gapL = doorX - doorW / 2;
+    const gapR = doorX + doorW / 2;
+    box(gh, gapL - (-ghW / 2), ghH, t, (-ghW / 2 + gapL) / 2, mid, -ghD / 2, shell);
+    box(gh, ghW / 2 - gapR, ghH, t, (ghW / 2 + gapR) / 2, mid, -ghD / 2, shell);
+    box(gh, doorW, ghH - doorH, t, doorX, y0 + doorH + (ghH - doorH) / 2, -ghD / 2, shell);
+    // Screen so the campus door does not look straight at the cage.
+    box(gh, t, ghH - 0.2, 1.15, 0.45, mid, -0.95, shell);
+    const hamster = classHamster(gh, 1.65, y0 + 0.02, 0.55);
+    hamster.scale.setScalar(2.3);
+    hamster.userData.secretPet = true;
     box(gh, ghW + 0.6, 0.3, ghD + 0.6, 0, ghH + 0.25, 0, colorMat(0x9c3b2a, { roughness: 0.7 }));
     const win = new THREE.MeshStandardMaterial({ color: 0x5f86a3, metalness: 0.6, roughness: 0.1, emissive: 0xffe0a8, emissiveIntensity: 0 });
     ctx.nightMaterials.push({ material: win, intensity: 0.8 });
     box(gh, 0.1, 1.2, 2.2, -ghW / 2 - 0.02, 1.8, 0.2, win, { cast: false }); // reception window facing the gate
     box(gh, 2.4, 1.2, 0.1, 0.8, 1.8, ghD / 2 + 0.02, win, { cast: false });
     box(gh, 0.6, 0.08, 2.4, -ghW / 2 - 0.3, 1.15, 0.2, white);              // window ledge
-    box(gh, 1.0, 2.2, 0.1, -1.6, 1.2, -ghD / 2 - 0.02, colorMat(0x6b4a2b, { roughness: 0.6 }));
+    const lodgeDoor = box(gh, 0.95, 2.15, 0.08, -1.05, 1.25, -ghD / 2 + 0.55, colorMat(0x6b4a2b, { roughness: 0.6 }));
+    lodgeDoor.rotation.y = 0.9;
     const ghSign = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.6), new THREE.MeshStandardMaterial({
       map: textTexture(['传达室'], { width: 256, height: 72, bg: '#ffffff', color: '#b8322a', font: 'bold 54px "PingFang SC","Microsoft YaHei",sans-serif' }),
     }));
@@ -230,8 +254,14 @@ registerBuilding('school', {
     ghSign2.position.set(-ghW / 2 - 0.03, ghH - 0.4, 0.2);
     gh.add(ghSign2);
     box(gh, 0.8, 0.6, 0.6, 1.6, ghH + 0.7, -0.6, sharedMaterial('concrete')); // AC unit
-    gh.position.set(gateX + gateW / 2 + 1 + ghW / 2 + 0.3, 0, D - 0.6 - ghD / 2 - 0.4);
+    const ghX = gateX + gateW / 2 + 1 + ghW / 2 + 0.3;
+    const ghZ = D - 0.6 - ghD / 2 - 0.4;
+    gh.position.set(ghX, 0, ghZ);
     g.add(gh);
+    markInterior(ctx, spec, [
+      [-8, 27, 20, 14],
+      [ghX, ghZ, 7, 6],
+    ]);
 
     // Perimeter fence with the gate opening.
     const posts = [];
@@ -250,6 +280,7 @@ registerBuilding('school', {
     }
     g.add(instancedFrom(new THREE.CylinderGeometry(1, 1, 1, 6), sharedMaterial('darkSteel'), posts, { castShadow: false }));
 
+    teachersApple(g, -7.0, 1.19, 26.2).scale.setScalar(1.8);
     g.userData.treeSpots = [[-21, -12], [-21, 9], [-21, 24], [21, 0], [21, 24], [12, 26], [-5, -13.5], [3, -13.5], [-21, -26.5], [21, -26.5]];
     g.userData.height = 24;
     return g;
