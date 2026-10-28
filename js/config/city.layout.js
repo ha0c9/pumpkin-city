@@ -310,8 +310,13 @@ export const ANIMALS = [
   { type: 'dolphin', count: 3, near: 'south' },
   { type: 'dolphin', count: 3, near: 'west' },
   { type: 'dolphin', count: 3, near: 'pearl' },
+  // A few more, kept in the shallows rather than the offshore pods.
+  { type: 'dolphin', count: 2, near: 'south', shallow: true },
+  { type: 'dolphin', count: 2, near: 'east', shallow: true },
+  { type: 'fish', count: 3, near: 'south' },
+  { type: 'fish', count: 3, near: 'central' },
   // Highland woods only: west ridge, north meadow, east grove hills.
-  { type: 'tiger', count: 3, island: 'west' },
-  { type: 'tiger', count: 3, island: 'north' },
-  { type: 'tiger', count: 2, island: 'east' },
+  { type: 'tiger', count: 2, island: 'west' },
+  { type: 'tiger', count: 2, island: 'north' },
+  { type: 'tiger', count: 1, island: 'east' },
 ];
