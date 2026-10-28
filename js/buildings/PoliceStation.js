@@ -4,7 +4,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { makeCanvas, canvasTexture, mergeColored } from '../core/Utils.js';
 import { colorMat, sharedMaterial, box, mesh, tiledBox } from './materials.js';
-import { donutBox } from './easterEggs.js';
+import { donutBox, secretRoom, slothClerk, markInterior } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -341,7 +341,7 @@ registerBuilding('policeStation', {
     name: '南瓜岛动物城警察局',
     nameEn: 'Pumpkin Island Zootopia Police Station',
   }),
-  create(ctx) {
+  create(ctx, spec) {
     const g = new THREE.Group();
     const sand = sandstoneMaterial();
     const rib = colorMat(0xc56d38, { roughness: 0.74 });
@@ -492,6 +492,19 @@ registerBuilding('policeStation', {
     }
 
     addLobby(g, ctx);
+
+    // Records room off the right side of the drum. The door faces the lobby,
+    // not the street, and the sloth sits behind the return wall.
+    secretRoom(g, 6.5, 0.22, -6.6, -Math.PI / 2, {
+      wall: 0xf4ead8, floor: 0xd8c4a4, trim: 0xc56d38,
+      width: 4.6, depth: 3.5, height: 3.15,
+      sign: ['档案室', 'RECORDS'],
+      furnish(room, spot) { slothClerk(room, spot.x, spot.y, spot.z, 0.8); },
+    });
+    markInterior(ctx, spec, [
+      [0, 8, 12, 44],
+      [8.4, -6.8, 8, 7],
+    ]);
 
     g.userData.treeSpots = [[-20, 16], [20, 16], [-18, -16], [18, -16]];
     g.userData.height = hallH + 8;

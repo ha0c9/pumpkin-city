@@ -1,5 +1,6 @@
-// Small cartoon props for the larger buildings. They sit in glass rooms, open
-// porches, on decks and in entrance nooks — a solid wall would hide them.
+// Small cartoon props for the larger buildings. Porch pieces sit where the street
+// can see them. secretRoom is the other kind: an opaque room with a real door,
+// and the prop tucked into a side alcove so it stays hidden until you walk in.
 import { textTexture } from '../core/Utils.js';
 import { colorMat, box, mesh } from './materials.js';
 
@@ -378,5 +379,218 @@ export function arrivalNook(parent, x, y, z) {
   teddy(g, 0.4, 0.08, 1.65);
   box(g, 0.42, 0.28, 0.24, -0.65, 0.22, 1.4, caseMat);
   box(g, 0.44, 0.035, 0.26, -0.65, 0.38, 1.4, frame, { cast: false });
+  return g;
+}
+
+/**
+ * Mark walkable rectangles in building-local space (x right, z toward the
+ * front door). They stay walkable even where the building footprint's pad
+ * would otherwise push the walker back outside.
+ */
+export function markInterior(ctx, spec, rects) {
+  if (!ctx?.mask || !spec?.position) return;
+  const [px, pz] = spec.position;
+  const rot = spec.rotation || 0;
+  const c = Math.cos(rot), s = Math.sin(rot);
+  for (const [lx, lz, w, d] of rects) {
+    ctx.mask.addRect(px + lx * c + lz * s, pz - lx * s + lz * c, w, d, rot, 'interior');
+  }
+}
+
+/**
+ * Opaque room. The door faces local +Z and the room runs toward -Z.
+ * The prop goes in the -X alcove, behind a return wall, so a straight look
+ * through the doorway hits the back wall and misses the prop.
+ * Floors sit near local y = 0 so a walking camera (eye ~1.7) can see them.
+ * `furnish(group, {x, y, z})` places the prop; the point is the alcove floor.
+ */
+export function secretRoom(parent, x, y, z, ry, opts = {}) {
+  const width = opts.width ?? 4.6;
+  const depth = opts.depth ?? 3.6;
+  const height = opts.height ?? 3.1;
+  const g = at(parent, x, y, z, ry);
+  const wallMat = new THREE.MeshStandardMaterial({ color: opts.wall ?? 0xf4efe6, roughness: 0.82, side: THREE.DoubleSide });
+  const floorMat = new THREE.MeshStandardMaterial({ color: opts.floor ?? 0xcbb892, roughness: 0.72, side: THREE.DoubleSide });
+  const trimMat = new THREE.MeshStandardMaterial({ color: opts.trim ?? 0x6e3b2a, roughness: 0.55, side: THREE.DoubleSide });
+  const ceilMat = new THREE.MeshStandardMaterial({
+    color: 0xfff6ea, emissive: 0xffe2b8, emissiveIntensity: 0.32, roughness: 0.9, side: THREE.DoubleSide,
+  });
+  const T = 0.16;
+  const hw = width / 2;
+  const doorW = Math.min(1.65, Math.max(1.15, width - 1.2));
+  const doorH = Math.min(2.35, height - 0.55);
+  box(g, width, 0.08, depth, 0, 0.04, -depth / 2, floorMat, { cast: false });
+  box(g, width - 0.12, 0.08, depth - 0.12, 0, height - 0.12, -depth / 2, ceilMat, { cast: false });
+  box(g, width + T, height, T, 0, height / 2, -depth, wallMat);
+  box(g, T, height, depth, -hw, height / 2, -depth / 2, wallMat);
+  box(g, T, height, depth, hw, height / 2, -depth / 2, wallMat);
+  const sideW = (width - doorW) / 2;
+  box(g, sideW, height, T, -hw + sideW / 2, height / 2, 0, wallMat);
+  box(g, sideW, height, T, hw - sideW / 2, height / 2, 0, wallMat);
+  box(g, doorW + 0.02, height - doorH, T, 0, doorH + (height - doorH) / 2, 0, wallMat);
+  box(g, 0.07, doorH, 0.1, -doorW / 2, doorH / 2, 0.05, trimMat, { cast: false });
+  box(g, 0.07, doorH, 0.1, doorW / 2, doorH / 2, 0.05, trimMat, { cast: false });
+  box(g, doorW + 0.14, 0.08, 0.1, 0, doorH, 0.05, trimMat, { cast: false });
+  const leaf = box(g, doorW * 0.88, doorH - 0.08, 0.05, doorW / 2 - 0.08, (doorH - 0.08) / 2, -0.55, trimMat);
+  leaf.rotation.y = -0.8;
+  const returnX = -(doorW / 2 + 0.28);
+  const returnLen = Math.min(depth - 0.4, Math.max(1.3, depth * 0.7));
+  box(g, T, height, returnLen, returnX, height / 2, -0.05 - returnLen / 2, wallMat);
+  const alcoveX = ((-hw + 0.36) + (returnX - 0.28)) / 2;
+  const alcoveZ = -Math.min(returnLen * 0.55, depth - 0.5);
+  if (opts.sign) {
+    const lines = Array.isArray(opts.sign) ? opts.sign : [opts.sign];
+    const tex = textTexture(lines, {
+      width: 512, height: 160, bg: '#5c3318', color: '#fff6e4',
+      font: 'bold 72px "PingFang SC","Microsoft YaHei","Noto Sans CJK SC","WenQuanYi Micro Hei",sans-serif',
+      subFont: 'bold 36px Arial, sans-serif',
+    });
+    const signMat = new THREE.MeshStandardMaterial({
+      map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.3, roughness: 0.5,
+    });
+    mesh(g, new THREE.PlaneGeometry(1.2, 0.38), signMat, 0, Math.min(doorH + 0.26, height - 0.24), 0.1, { cast: false });
+  }
+  mesh(g, new THREE.SphereGeometry(0.07, 8, 6), ceilMat, alcoveX, height - 0.28, alcoveZ, { cast: false });
+  if (opts.furnish) opts.furnish(g, { x: alcoveX, y: 0.08, z: alcoveZ });
+  return g;
+}
+
+/** Sauce, an open recipe book and a pumpkin, for the pasta kitchen. */
+export function pantryShelf(parent, x, y, z) {
+  const g = at(parent, x, y, z, 0.5);
+  const wood = colorMat(0x8d5a32, { roughness: 0.65 });
+  const red = colorMat(0xb8322a, { roughness: 0.45 });
+  const paper = colorMat(0xfff8ee, { roughness: 0.75 });
+  const pumpkin = colorMat(0xe07a2f, { roughness: 0.55 });
+  const green = colorMat(0x3d8a3a, { roughness: 0.6 });
+  const gold = colorMat(0xf0c14d, { roughness: 0.4, metalness: 0.45 });
+  box(g, 0.08, 0.7, 0.32, -0.32, 0.35, 0, wood);
+  box(g, 0.08, 0.7, 0.32, 0.32, 0.35, 0, wood);
+  box(g, 0.72, 0.06, 0.34, 0, 0.7, 0, wood);
+  mesh(g, new THREE.CylinderGeometry(0.09, 0.1, 0.26, 10), red, -0.14, 0.88, 0);
+  mesh(g, new THREE.CylinderGeometry(0.06, 0.06, 0.04, 8), gold, -0.14, 1.03, 0, { cast: false });
+  const left = box(g, 0.2, 0.02, 0.15, 0.08, 0.76, 0.02, paper, { cast: false });
+  left.rotation.z = 0.2;
+  left.rotation.y = -0.25;
+  const right = box(g, 0.2, 0.02, 0.15, 0.26, 0.76, 0, paper, { cast: false });
+  right.rotation.z = -0.12;
+  right.rotation.y = 0.3;
+  mesh(g, new THREE.CylinderGeometry(0.012, 0.012, 0.36, 5), wood, 0.02, 0.9, -0.04, { cast: false }).rotation.z = 0.8;
+  mesh(g, new THREE.SphereGeometry(0.045, 6, 5), wood, -0.1, 0.78, -0.04, { cast: false }).scale.set(1, 0.4, 1.25);
+  mesh(g, new THREE.SphereGeometry(0.14, 10, 8), pumpkin, 0.12, 0.14, 0.22);
+  mesh(g, new THREE.CylinderGeometry(0.02, 0.02, 0.07, 5), green, 0.12, 0.28, 0.22, { cast: false });
+  return g;
+}
+
+/** Sleeping sloth in a chair — the records clerk. */
+export function slothClerk(parent, x, y, z, ry = 0) {
+  const g = at(parent, x, y, z, ry);
+  const fur = colorMat(0x8d7868, { roughness: 0.78 });
+  const faceC = colorMat(0xe6d2ba, { roughness: 0.7 });
+  const dark = colorMat(0x2a2420, { roughness: 0.5 });
+  const cloth = colorMat(0x2c5ed2, { roughness: 0.55 });
+  const wood = colorMat(0x6b3a22, { roughness: 0.7 });
+  box(g, 0.58, 0.08, 0.5, 0, 0.42, 0, wood);
+  box(g, 0.52, 0.5, 0.08, 0, 0.72, -0.22, wood);
+  box(g, 0.08, 0.42, 0.08, -0.22, 0.21, 0.16, wood);
+  box(g, 0.08, 0.42, 0.08, 0.22, 0.21, 0.16, wood);
+  mesh(g, new THREE.SphereGeometry(0.28, 10, 8), fur, 0, 0.74, 0.02).scale.set(1.15, 1.2, 0.9);
+  box(g, 0.32, 0.26, 0.06, 0, 0.72, 0.18, cloth, { cast: false });
+  mesh(g, new THREE.SphereGeometry(0.2, 10, 8), faceC, 0, 1.14, 0.05);
+  for (const s of [-1, 1]) {
+    mesh(g, new THREE.SphereGeometry(0.055, 6, 5), dark, s * 0.07, 1.16, 0.2, { cast: false }).scale.set(1.35, 0.55, 0.35);
+    mesh(g, new THREE.SphereGeometry(0.04, 6, 5), fur, s * 0.16, 1.28, 0.02, { cast: false });
+  }
+  mesh(g, new THREE.TorusGeometry(0.045, 0.01, 4, 8, Math.PI), dark, 0, 1.05, 0.2, { cast: false }).rotation.z = Math.PI;
+  box(g, 0.08, 0.5, 0.08, -0.34, 0.52, 0.08, fur).rotation.z = 0.3;
+  box(g, 0.08, 0.5, 0.08, 0.34, 0.52, 0.08, fur).rotation.z = -0.22;
+  box(g, 0.12, 0.035, 0.06, -0.42, 0.28, 0.1, dark, { cast: false });
+  box(g, 0.12, 0.035, 0.06, 0.42, 0.3, 0.1, dark, { cast: false });
+  return g;
+}
+
+/** A turned-down bed, a pumpkin pillow and the spare room key. */
+export function hotelNook(parent, x, y, z) {
+  const g = at(parent, x, y, z, 0.35);
+  const wood = colorMat(0x8d5a32, { roughness: 0.6 });
+  const sheet = colorMat(0xf7f4ee, { roughness: 0.72 });
+  const quilt = colorMat(0xffcf2e, { roughness: 0.65 });
+  const pumpkin = colorMat(0xe07a2f, { roughness: 0.55 });
+  const gold = colorMat(0xf0c14d, { roughness: 0.32, metalness: 0.75 });
+  const red = colorMat(0xb8322a, { roughness: 0.5 });
+  box(g, 1.2, 0.1, 0.64, 0, 0.28, 0, wood);
+  box(g, 0.08, 0.4, 0.64, -0.58, 0.5, 0, wood);
+  box(g, 1.05, 0.08, 0.52, 0.04, 0.36, 0, sheet, { cast: false });
+  box(g, 0.72, 0.07, 0.48, 0.16, 0.43, 0, quilt, { cast: false });
+  mesh(g, new THREE.SphereGeometry(0.12, 8, 6), pumpkin, -0.32, 0.5, 0.02, { cast: false });
+  mesh(g, new THREE.CylinderGeometry(0.015, 0.015, 0.08, 5), colorMat(0x3d8a3a, { roughness: 0.6 }), -0.32, 0.62, 0.02, { cast: false });
+  mesh(g, new THREE.TorusGeometry(0.055, 0.012, 5, 8), gold, 0.42, 0.95, 0.02, { cast: false });
+  box(g, 0.07, 0.1, 0.02, 0.42, 0.82, 0.04, red, { cast: false });
+  box(g, 0.16, 0.22, 0.03, 0.42, 0.55, 0.2, red, { cast: false });
+  mesh(g, new THREE.TorusGeometry(0.045, 0.012, 4, 8), red, 0.42, 0.68, 0.22, { cast: false });
+  return g;
+}
+
+/** Class hamster in a wire cage, the gatehouse pet. */
+export function classHamster(parent, x, y, z) {
+  const g = at(parent, x, y, z, 0.4);
+  const metal = colorMat(0xd5dbe2, { roughness: 0.32, metalness: 0.65 });
+  const fur = colorMat(0xd7a15a, { roughness: 0.7 });
+  const pink = colorMat(0xf0a0b4, { roughness: 0.5 });
+  const dark = colorMat(0x2a2420, { roughness: 0.5 });
+  box(g, 0.72, 0.04, 0.5, 0, 0.02, 0, metal, { cast: false });
+  box(g, 0.72, 0.03, 0.03, 0, 0.58, -0.23, metal, { cast: false });
+  box(g, 0.72, 0.03, 0.03, 0, 0.58, 0.23, metal, { cast: false });
+  box(g, 0.03, 0.03, 0.44, -0.34, 0.58, 0, metal, { cast: false });
+  box(g, 0.03, 0.03, 0.44, 0.34, 0.58, 0, metal, { cast: false });
+  for (const [dx, dz] of [[-0.32, -0.22], [0.32, -0.22], [-0.32, 0.22], [0.32, 0.22]]) {
+    box(g, 0.03, 0.56, 0.03, dx, 0.3, dz, metal, { cast: false });
+  }
+  for (const dx of [-0.16, 0, 0.16]) box(g, 0.02, 0.54, 0.02, dx, 0.3, 0.22, metal, { cast: false });
+  mesh(g, new THREE.SphereGeometry(0.11, 8, 6), fur, -0.06, 0.16, 0);
+  mesh(g, new THREE.SphereGeometry(0.035, 6, 5), pink, -0.02, 0.14, 0.09, { cast: false });
+  mesh(g, new THREE.SphereGeometry(0.016, 5, 4), dark, 0, 0.16, 0.11, { cast: false });
+  mesh(g, new THREE.SphereGeometry(0.04, 6, 5), pink, -0.14, 0.22, 0, { cast: false });
+  mesh(g, new THREE.TorusGeometry(0.09, 0.012, 5, 10), metal, 0.16, 0.26, 0, { cast: false });
+  return g;
+}
+
+/** Beaker and a little microscope on the lab bench. */
+export function labBench(parent, x, y, z) {
+  const g = at(parent, x, y, z, -0.35);
+  const top = colorMat(0xd5dbe2, { roughness: 0.35, metalness: 0.4 });
+  const leg = colorMat(0x1b2733, { roughness: 0.5, metalness: 0.35 });
+  const glass = new THREE.MeshStandardMaterial({
+    color: 0xd7f3ff, transparent: true, opacity: 0.38, roughness: 0.05,
+  });
+  const liquid = colorMat(0x3dffa0, { roughness: 0.28, emissive: 0x1c8a48 });
+  const glow = colorMat(0x9be7ff, { roughness: 0.3, emissive: 0x38d9ff });
+  box(g, 0.95, 0.06, 0.48, 0, 0.74, 0, top);
+  for (const [dx, dz] of [[-0.4, -0.18], [0.4, -0.18], [-0.4, 0.18], [0.4, 0.18]]) {
+    box(g, 0.05, 0.74, 0.05, dx, 0.37, dz, leg);
+  }
+  mesh(g, new THREE.CylinderGeometry(0.1, 0.11, 0.3, 10), glass, -0.16, 0.96, 0, { cast: false });
+  mesh(g, new THREE.CylinderGeometry(0.075, 0.075, 0.14, 10), liquid, -0.16, 0.88, 0, { cast: false });
+  mesh(g, new THREE.SphereGeometry(0.028, 6, 5), liquid, -0.12, 1.08, 0.02, { cast: false });
+  mesh(g, new THREE.SphereGeometry(0.018, 6, 5), liquid, -0.2, 1.12, -0.02, { cast: false });
+  box(g, 0.18, 0.08, 0.24, 0.22, 0.82, 0, leg);
+  box(g, 0.06, 0.28, 0.06, 0.22, 1.0, 0, leg);
+  mesh(g, new THREE.CylinderGeometry(0.045, 0.05, 0.1, 8), glow, 0.22, 1.18, 0.07, { cast: false }).rotation.x = Math.PI / 2;
+  return g;
+}
+
+/** A pocket Liberty Bell on a stand. */
+export function libertyBell(parent, x, y, z) {
+  const g = at(parent, x, y, z);
+  const gold = colorMat(0xd4af37, { roughness: 0.32, metalness: 0.78 });
+  const wood = colorMat(0x6b3a22, { roughness: 0.65 });
+  const dark = colorMat(0x3a2a22, { roughness: 0.5 });
+  box(g, 0.72, 0.12, 0.72, 0, 0.06, 0, wood);
+  mesh(g, new THREE.CylinderGeometry(0.08, 0.1, 0.55, 8), wood, 0, 0.4, 0);
+  box(g, 0.5, 0.08, 0.12, 0, 0.72, 0, wood);
+  mesh(g, new THREE.SphereGeometry(0.26, 12, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), gold, 0, 1.05, 0);
+  mesh(g, new THREE.CylinderGeometry(0.28, 0.3, 0.08, 12), gold, 0, 0.82, 0);
+  mesh(g, new THREE.SphereGeometry(0.04, 6, 5), dark, 0, 0.78, 0, { cast: false });
+  box(g, 0.025, 0.2, 0.02, 0.1, 0.95, 0.22, dark, { cast: false });
   return g;
 }

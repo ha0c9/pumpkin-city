@@ -2,7 +2,7 @@
 import { registerBuilding } from '../core/Registry.js';
 import { makeCanvas, canvasTexture } from '../core/Utils.js';
 import { windowWallMaterial, sharedMaterial, colorMat, box, tiledBox, mesh } from './materials.js';
-import { lobbyDuck } from './easterEggs.js';
+import { lobbyDuck, secretRoom, hotelNook, markInterior } from './easterEggs.js';
 
 const THREE = window.THREE;
 
@@ -30,7 +30,7 @@ function homeInnSign(width, height) {
 registerBuilding('homeInn', {
   label: '酒店 Hotel',
   footprint: [40, 22],
-  create(ctx) {
+  create(ctx, spec) {
     const g = new THREE.Group();
     const floors = 6, floorH = 3.2, W = 34, D = 14;
     const H = floors * floorH;
@@ -45,12 +45,49 @@ registerBuilding('homeInn', {
     upper.castShadow = true; upper.receiveShadow = true;
     g.add(upper);
 
-    // Ground floor: white base with a glass lobby.
+    // Ground floor is a walk-in lobby: walls and a door, not a solid box.
     const white = sharedMaterial('white');
-    box(g, W, floorH, D, 0, floorH / 2 + 0.25, -1, white);
-    const lobby = new THREE.MeshStandardMaterial({ color: 0x9cc3d8, metalness: 0.8, roughness: 0.08, emissive: 0xfff0c8, emissiveIntensity: 0.1 });
-    ctx.nightMaterials.push({ material: lobby, intensity: 0.9, base: 0.1 });
-    box(g, 12, floorH - 0.6, 0.2, 0, floorH / 2 + 0.1, 6.05, lobby, { cast: false });
+    const shell = white.clone();
+    shell.side = THREE.DoubleSide;
+    const T = 0.28;
+    const baseY = 0.25;
+    const zc = -1;
+    const frontZ = zc + D / 2;
+    const backZ = zc - D / 2;
+    const doorW = 2.6;
+    const doorH = 2.45;
+    const yMid = baseY + floorH / 2;
+    box(g, W - 0.3, 0.1, D - 0.3, 0, baseY + 0.05, zc, shell, { cast: false });
+    box(g, W, floorH, T, 0, yMid, backZ, shell);
+    box(g, T, floorH, D, -W / 2, yMid, zc, shell);
+    box(g, T, floorH, D, W / 2, yMid, zc, shell);
+    const sideW = (W - doorW) / 2;
+    box(g, sideW, floorH, T, -W / 2 + sideW / 2, yMid, frontZ, shell);
+    box(g, sideW, floorH, T, W / 2 - sideW / 2, yMid, frontZ, shell);
+    box(g, doorW, floorH - doorH, T, 0, baseY + doorH + (floorH - doorH) / 2, frontZ, shell);
+    const lobbyGlass = new THREE.MeshStandardMaterial({
+      color: 0x9cc3d8, metalness: 0.75, roughness: 0.08, emissive: 0xfff0c8, emissiveIntensity: 0.08,
+      transparent: true, opacity: 0.28, side: THREE.DoubleSide,
+    });
+    ctx.nightMaterials.push({ material: lobbyGlass, intensity: 0.85, base: 0.08 });
+    for (const x of [-6.8, 6.8]) box(g, 4.4, 1.7, 0.08, x, 1.75, frontZ + 0.06, lobbyGlass, { cast: false });
+    const deskWood = colorMat(0x8d5a32, { roughness: 0.55 });
+    box(g, 3.4, 1.05, 0.72, 0.2, 0.82, -0.6, deskWood);
+    box(g, 3.6, 0.08, 0.9, 0.2, 1.38, -0.6, colorMat(0xf7f4ee, { roughness: 0.5 }));
+    const ceil = new THREE.MeshStandardMaterial({
+      color: 0xfff6ea, emissive: 0xffe2b0, emissiveIntensity: 0.28, roughness: 0.9, side: THREE.DoubleSide,
+    });
+    box(g, 16, 0.06, 10, 0, floorH + 0.05, -0.5, ceil, { cast: false });
+    secretRoom(g, -5.4, 0.28, -2.4, Math.PI / 2, {
+      wall: 0xf7f1e6, floor: 0xe7d7b8, trim: 0x1b4fa0,
+      width: 4.4, depth: 3.6, height: 2.95,
+      sign: ['备品间', 'LINEN'],
+      furnish(room, spot) { hotelNook(room, spot.x, spot.y, spot.z); },
+    });
+    markInterior(ctx, spec, [
+      [0, 5, 18, 20],
+      [-7.2, -2.4, 8, 6],
+    ]);
     // White vertical fins and a blue stripe that runs up the stair core.
     for (const x of [-W / 2 + 0.3, W / 2 - 0.3]) box(g, 0.8, H + 0.6, D + 0.4, x, (H + 0.6) / 2 + 0.25, -1, white);
     box(g, 2.6, H - floorH, 0.3, -W / 2 + 4.5, floorH + (H - floorH) / 2 + 0.25, 6.1, colorMat(0x1b4fa0, { roughness: 0.5 }));

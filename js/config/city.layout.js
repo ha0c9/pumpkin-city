@@ -91,7 +91,7 @@ export const LANDMARKS = [
   {
     type: 'americaMuseum', id: 'america-museum',
     name: '美国博物馆', nameEn: 'Museum of America',
-    description: '典型的美国联邦风格建筑：红砖立面、白色科林斯柱廊与三角山花，中央钟楼顶着白色尖塔，门前是草坪与旗杆。',
+    description: '典型的美国联邦风格建筑：红砖立面、白色科林斯柱廊与三角山花，中央钟楼顶着白色尖塔，门前是草坪与旗杆。正门可以走进大厅，左侧展厅里的小自由钟从门外看不见。',
     position: [-39, -33], rotation: 0,
   },
   {
@@ -103,7 +103,7 @@ export const LANDMARKS = [
   {
     type: 'school', id: 'jiangsu-road-no2',
     name: '江苏路第二小学', nameEn: 'Jiangsu Road No.2 Primary School',
-    description: '校门朝向江苏路，设有传达室。三层教学楼、钟楼、200 米环形跑道、足球场与升旗台。',
+    description: '校门朝向江苏路，设有传达室。传达室可以从校园一侧走进去，仓鼠笼在门后的角落里，街上的窗户看不到。三层教学楼、钟楼、200 米环形跑道、足球场与升旗台。',
     position: [-112.5, 34.2], rotation: PI / 2,
   },
   {
@@ -117,13 +117,13 @@ export const LANDMARKS = [
   {
     type: 'policeStation', id: 'zootopia-police',
     name: '南瓜岛动物城警察局', nameEn: 'Pumpkin Island Zootopia Police Station',
-    description: '武夷路南侧的圆厅警察局：暖色石砌墙、竖向壁柱、草地屋顶和玻璃网格穹顶。门楣写着南瓜岛动物城警察局，前门挂着圆形警徽。大厅里有弧形接待台、一盒甜甜圈和豹警官，门口台阶通向广场，巡逻警车从这里出发。',
+    description: '武夷路南侧的圆厅警察局：暖色石砌墙、竖向壁柱、草地屋顶和玻璃网格穹顶。门楣写着南瓜岛动物城警察局，前门挂着圆形警徽。大厅里有弧形接待台、一盒甜甜圈和豹警官。右侧档案室从正门看不见，走进去才能看到打瞌睡的树懒。门口台阶通向广场，巡逻警车从这里出发。',
     position: [112, 100], rotation: PI,
   },
   {
     type: 'homeInn', id: 'home-inn',
     name: '如家酒店', nameEn: 'Home Inn',
-    description: '简约舒适的经济型连锁酒店，明黄色立面与蓝色招牌，共 6 层 120 间客房。',
+    description: '简约舒适的经济型连锁酒店，明黄色立面与蓝色招牌，共 6 层 120 间客房。一楼大厅可以走进去，左侧备品间从街上看不见，里面有一张铺好的小床和备用房卡。',
     position: [112.5, 34.2], rotation: PI,
   },
   {
@@ -153,7 +153,7 @@ export const LANDMARKS = [
   {
     type: 'scienceMuseum', id: 'science-museum',
     name: '科技馆', nameEn: 'Science & Technology Museum',
-    description: '悬浮的银色球幕影院、环形光带与参数化幕墙，展示航天、人工智能与新能源科技。',
+    description: '悬浮的银色球幕影院、环形光带与参数化幕墙，展示航天、人工智能与新能源科技。正门门厅可以走进去，左侧实验台从门外看不见。',
     position: [-435, -108], rotation: 0,
   },
   {

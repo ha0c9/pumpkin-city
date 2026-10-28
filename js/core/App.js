@@ -105,8 +105,15 @@ export class App {
         const b = this.bridges.heightAt(x, z);
         return Math.max(this.terrain.heightAt(x, z), b === null ? -Infinity : b, 0);
       },
-      walkable: (x, z) => (this.terrain.heightAt(x, z) > 0.6 || this.bridges.heightAt(x, z) !== null)
-        && this.ctx.mask.hit(x, z, 2, 'building') === null,
+      // Building footprints keep a 2m pad so the walker is not dropped inside a
+      // wall. Rooms tagged 'interior' (door, lobby, and a porch past that pad)
+      // stay walkable, which is how roam mode can start at a doorway.
+      walkable: (x, z) => {
+        const onLand = this.terrain.heightAt(x, z) > 0.6 || this.bridges.heightAt(x, z) !== null;
+        if (!onLand) return false;
+        if (this.ctx.mask.hit(x, z, 0, 'interior')) return true;
+        return this.ctx.mask.hit(x, z, 2, 'building') === null;
+      },
       limit: 780,
     });
     this.controls.target.set(0, 6, -40);
