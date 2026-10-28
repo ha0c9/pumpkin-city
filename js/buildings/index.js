@@ -19,6 +19,7 @@ import './ConvenienceStore.js';
 import './Restaurant.js';
 import './School.js';
 import './SchoolAheadSign.js';
+import './SubwayEntrance.js';
 import './EquestrianCenter.js';
 import './ConstructionSite.js';
 import './Factory.js';
