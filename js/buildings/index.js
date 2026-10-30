@@ -13,6 +13,7 @@ import './OceanMuseum.js';
 import './OceanGallery.js';
 import './HomeInn.js';
 import './PoliceStation.js';
+import './Hospital.js';
 import './FourSeasons.js';
 import './ScienceMuseum.js';
 import './ConvenienceStore.js';

@@ -157,6 +157,12 @@ export const LANDMARKS = [
     position: [-435, -108], rotation: 0,
   },
   {
+    type: 'hospital', id: 'pumpkin-hospital',
+    name: '南瓜岛医院', nameEn: 'Pumpkin Island Hospital',
+    description: '北原岛南端、雾林路南侧，原来的口袋公园改成了医院。东侧是三层门诊楼，西侧是八层病房楼，楼身和屋顶都有红十字。西侧停车场停着救护车，路上的救护车也从这里出发。',
+    position: [-10, -454], rotation: PI,
+  },
+  {
     type: 'planetarium', id: 'planetarium',
     name: '天文馆', nameEn: 'Planetarium',
     description: '北原岛上的天文馆：流线形的银色主馆前端高高翘起，屋顶托着一颗巨大的球幕影院，右侧通过桁架廊桥连接观星球。夜晚球体会亮起星图。正门球幕厅可以走进去，里面有一台星空放映机。',
@@ -262,8 +268,7 @@ export const LOTS = {
     { position: [112, -98], rotation: PI, size: [58, 50] },
     // 东林岛
     { position: [448, 13], rotation: 0, size: [66, 38] },
-    // 北原岛
-    { position: [-10, -452], rotation: PI, size: [74, 60] },
+    // 北原岛（南端口袋公园已改为南瓜岛医院）
     { position: [-102, -532], rotation: 0, size: [60, 64] },
     // 西岭岛
     { position: [-440, -8], rotation: PI, size: [56, 56] },
