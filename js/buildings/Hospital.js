@@ -1,8 +1,9 @@
 // 南瓜岛医院 — a low outpatient wing beside a taller ward tower, red crosses, and an ambulance bay.
 import { registerBuilding } from '../core/Registry.js';
 import { makeCanvas, canvasTexture } from '../core/Utils.js';
-import { sharedMaterial, colorMat, box, tiledBox } from './materials.js';
+import { sharedMaterial, colorMat, box, tiledBox, mesh } from './materials.js';
 import { createAmbulance } from '../world/ambulanceModel.js';
+import { createHelicopter } from '../world/Helicopter.js';
 
 const THREE = window.THREE;
 const CJK = '"WenQuanYi Micro Hei","PingFang SC","Microsoft YaHei","Noto Sans CJK SC","Noto Sans SC",sans-serif';
@@ -120,8 +121,44 @@ registerBuilding('hospital', {
     ctx.nightMaterials.push({ material: crossMat, intensity: 0.9, base: 0.2 });
     crossPanel(g, 6.6, tower.x, 21.2, tower.z + tower.d / 2 + 0.2, 0, crossMat);
     crossPanel(g, 6.2, tower.x + tower.w / 2 + 0.16, 21.2, tower.z, Math.PI / 2, crossMat);
-    const roofCross = crossPanel(g, 8.2, tower.x, tower.h + 0.75, tower.z + 2, 0, crossMat);
-    roofCross.rotation.x = -Math.PI / 2;
+
+    // Roof helipad replaces the roof cross. The shuttle flies to America Tower 2.
+    const padMap = (() => {
+      const c = makeCanvas(256, 256);
+      const x = c.getContext('2d');
+      x.fillStyle = '#2c4634';
+      x.fillRect(0, 0, 256, 256);
+      x.strokeStyle = '#f4f4f2';
+      x.lineWidth = 14;
+      x.beginPath();
+      x.arc(128, 128, 100, 0, Math.PI * 2);
+      x.stroke();
+      x.fillStyle = '#f4f4f2';
+      x.fillRect(86, 68, 22, 120);
+      x.fillRect(148, 68, 22, 120);
+      x.fillRect(86, 117, 84, 22);
+      return canvasTexture(c, { anisotropy: 4 });
+    })();
+    const padMat = new THREE.MeshStandardMaterial({ map: padMap, roughness: 0.9 });
+    const padY = tower.h + 0.82;
+    const padZ = tower.z + 4;
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 5.2, 0.28, 28), [steel, padMat, steel]);
+    pad.position.set(tower.x, padY, padZ);
+    pad.castShadow = true;
+    g.add(pad);
+    const padLight = new THREE.MeshStandardMaterial({ color: 0x16331c, emissive: 0x39ff6a, emissiveIntensity: 0.15 });
+    ctx.nightMaterials.push({ material: padLight, intensity: 2 });
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      mesh(g, new THREE.SphereGeometry(0.16, 8, 6), padLight, tower.x + Math.cos(a) * 4.7, padY + 0.22, padZ + Math.sin(a) * 4.7, { cast: false });
+    }
+    const padTop = padY + 0.14;
+    const yaw = new THREE.Group();
+    yaw.userData.dynamic = true;
+    const heli = createHelicopter();
+    yaw.add(heli);
+    g.add(yaw);
+    g.userData.heli = yaw;
 
     // Ambulance bay on the west side of the plaza, three bays facing the road.
     const asphalt = colorMat(0x3a3f46, { roughness: 0.92 });
@@ -152,12 +189,37 @@ registerBuilding('hospital', {
       g.add(amb);
       lamps.push(amb.userData.lamps);
     }
+    const padLocal = new THREE.Vector3(tower.x, padTop, padZ);
+    // America Tower 2 helipad: local top is yTop + 6.75, island ground is 2.
+    const towerPad = new THREE.Vector3(113, 2 + 12.8 + 26 * 3.6 + 6.75, -33);
     g.userData.animate = (t) => {
       const f = 0.5 + 0.5 * Math.sin(t * 10);
       for (const [a, b] of lamps) {
         a.emissiveIntensity = 0.2 + f * 2.6;
         b.emissiveIntensity = 0.2 + (1 - f) * 2.6;
       }
+      const dwell = 12, fly = 18, cycle = (dwell + fly) * 2;
+      const u = t % cycle;
+      const ease = (x) => x * x * (3 - 2 * x);
+      // Parent rotation is PI, so local (lx, lz) maps to world (px - lx, pz - lz).
+      const here = new THREE.Vector3(g.position.x - padLocal.x, g.position.y + padLocal.y, g.position.z - padLocal.z);
+      let from = here, to = towerPad, k = 0, flying = false;
+      if (u < dwell) { from = here; to = towerPad; k = 0; }
+      else if (u < dwell + fly) { from = here; to = towerPad; k = ease((u - dwell) / fly); flying = true; }
+      else if (u < dwell * 2 + fly) { from = towerPad; to = here; k = 0; }
+      else { from = towerPad; to = here; k = ease((u - dwell * 2 - fly) / fly); flying = true; }
+      const lift = flying ? Math.sin(k * Math.PI) * 38 : 0;
+      const wx = from.x + (to.x - from.x) * k;
+      const wy = from.y + (to.y - from.y) * k + lift;
+      const wz = from.z + (to.z - from.z) * k;
+      yaw.position.set(g.position.x - wx, wy - g.position.y, g.position.z - wz);
+      const faceX = to.x - from.x, faceZ = to.z - from.z;
+      const worldYaw = Math.atan2(faceX, faceZ);
+      yaw.rotation.y = worldYaw - Math.PI;
+      heli.rotation.x = flying ? 0.16 : 0;
+      heli.userData.rotor.rotation.y = t * 22;
+      heli.userData.tailRotor.rotation.x = t * 36;
+      heli.userData.beacon.emissiveIntensity = 0.2 + (0.5 + 0.5 * Math.sin(t * (flying ? 16 : 4))) * 2.2;
     };
 
     g.userData.treeSpots = [[-32, 22], [10, 23]];

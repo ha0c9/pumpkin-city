@@ -17,8 +17,7 @@ const INFO = {
   turtle: { name: '海龟', nameEn: 'Sea Turtle', category: '动物 Animal', description: '圆壳、宽鳍，在近岸浅水里慢慢划水的卡通海龟。' },
   swan: { name: '天鹅', nameEn: 'Swan', category: '动物 Animal', description: '白羽、橙喙、弯长颈，在水面上滑行的卡通天鹅。' },
   dolphin: { name: '海豚', nameEn: 'Dolphin', category: '动物 Animal', description: '灰背白肚、短吻微笑的卡通海豚。深水区成群跃出水面，南湾和东林的浅海也有几只贴着水面游。' },
-  fish: { name: '鱼', nameEn: 'Fish', category: '动物 Animal', description: '银白、橙色或蓝色的小鱼，在南湾和中心岛的浅海里成小群游动。' },
-  tiger: { name: '老虎', nameEn: 'Tiger', category: '动物 Animal', description: '橙毛黑纹、白肚和长尾巴，在西岭、北原和东林的高地林子里慢慢游荡的卡通老虎。' },
+  fish: { name: '鱼', nameEn: 'Fish', category: '动物 Animal', description: '银白、橙色或蓝色的小鱼，在各岛浅海里成小群游动。' },
 };
 
 const SWIMMERS = new Set(['duck', 'turtle', 'swan']);
@@ -355,58 +354,6 @@ function makeFish(hue) {
   return g;
 }
 
-function makeTiger() {
-  const g = new THREE.Group();
-  const fur = mat(0xe07a2a), stripe = mat(0x1c140e), white = mat(0xf6f1e8), pink = mat(0xee9aaa), amber = mat(0xf0b429, 0.4);
-  const s = sphere(1, 12, 8);
-  g.add(part(s, fur, 0, 0.82, 0.02, 0.4, 0.32, 0.86, true));
-  g.add(part(s, white, 0, 0.62, 0.08, 0.28, 0.16, 0.62));
-  for (const z of [-0.42, -0.18, 0.06, 0.28, 0.48]) {
-    g.add(part(s, stripe, 0, 1.05, z, 0.36, 0.07, 0.055, true));
-  }
-  const neck = new THREE.Group();
-  neck.position.set(0, 1.0, 0.82);
-  const head = new THREE.Group();
-  head.position.set(0, 0.16, 0.2);
-  head.add(part(s, fur, 0, 0.02, 0.02, 0.22, 0.2, 0.24, true));
-  head.add(part(s, white, 0, -0.04, 0.16, 0.14, 0.1, 0.12));
-  head.add(part(s, pink, 0, -0.02, 0.28, 0.045, 0.035, 0.03));
-  head.add(part(s, stripe, 0, 0.12, 0.12, 0.04, 0.1, 0.03));
-  for (const side of [-1, 1]) {
-    head.add(part(s, amber, side * 0.08, 0.06, 0.18, 0.05, 0.055, 0.032));
-    head.add(part(sphere(1, 6, 4), stripe, side * 0.08, 0.06, 0.205, 0.018, 0.03, 0.012));
-    const ear = part(s, fur, side * 0.16, 0.16, -0.02, 0.06, 0.08, 0.04, true);
-    ear.rotation.z = side * -0.4;
-    head.add(ear);
-    head.add(part(s, white, side * 0.16, 0.15, 0.0, 0.03, 0.045, 0.02));
-    head.add(part(s, stripe, side * 0.12, 0.0, 0.2, 0.05, 0.012, 0.02));
-  }
-  neck.add(head);
-  g.add(neck);
-  const legs = [];
-  const legGeo = geoOnce('tiger-leg', () => {
-    const geo = new THREE.CylinderGeometry(0.07, 0.05, 0.7, 6);
-    geo.translate(0, -0.35, 0);
-    return geo;
-  });
-  for (const [x, z] of [[-0.18, 0.42], [0.18, 0.42], [-0.18, -0.42], [0.18, -0.42]]) {
-    const leg = part(legGeo, fur, x, 0.72, z, 1, 1, 1, true);
-    leg.add(part(s, stripe, 0, -0.22, 0, 0.09, 0.045, 0.09));
-    g.add(leg);
-    legs.push(leg);
-  }
-  const tail = new THREE.Group();
-  tail.position.set(0, 0.78, -0.7);
-  tail.add(part(cyl(0.035, 0.05, 0.82, 6), fur, 0, 0.4, 0));
-  tail.add(part(s, stripe, 0, 0.28, 0, 0.065, 0.07, 0.065));
-  tail.add(part(s, stripe, 0, 0.52, 0, 0.06, 0.07, 0.06));
-  tail.add(part(s, stripe, 0, 0.78, 0, 0.09, 0.12, 0.09));
-  tail.rotation.x = -1.05;
-  g.add(tail);
-  g.userData.parts = { legs, tail };
-  return g;
-}
-
 export class Animals {
   constructor(ctx, terrain, groundMap, mask, water) {
     this.ctx = ctx;
@@ -446,32 +393,6 @@ export class Animals {
       }
     }
     return near ? near.clone() : new THREE.Vector3(isl.x, 0, isl.z);
-  }
-
-  /** Open grass on a hill, above the island plateau, so tigers stay in the woods. */
-  _highlandPoint(isl, near = null) {
-    const hills = isl.hills || [];
-    const floor = (isl.height ?? isl.ground ?? 0) + 1.4;
-    for (let k = 0; k < 220; k++) {
-      let x, z;
-      if (near && k < 90) {
-        const a = this.rng() * Math.PI * 2;
-        const r = 8 + this.rng() * 26;
-        x = near.x + Math.cos(a) * r;
-        z = near.z + Math.sin(a) * r;
-      } else if (hills.length) {
-        const h = hills[Math.floor(this.rng() * hills.length)];
-        const a = this.rng() * Math.PI * 2;
-        const r = Math.sqrt(this.rng()) * h[2] * 0.82;
-        x = h[0] + Math.cos(a) * r;
-        z = h[1] + Math.sin(a) * r;
-      } else break;
-      if (this.terrain.islandAt(x, z) !== isl) continue;
-      if (this.terrain.heightAt(x, z) < floor) continue;
-      if (this.ground.grassAt(x, z) > 0.4 && this.mask.isFree(x, z, 2.5)) return new THREE.Vector3(x, 0, z);
-    }
-    if (hills.length) return new THREE.Vector3(hills[0][0], 0, hills[0][1]);
-    return this._landPoint(isl, near);
   }
 
   _waterPoint(isl, near = null) {
@@ -545,7 +466,6 @@ export class Animals {
     let obj;
     const a = { type: spec.type, speed: 0, state: 'move', timer: 0, phase: rng() * 10 };
     if (spec.type === 'deer') { obj = makeDeer(rng); a.speed = 1.3; }
-    else if (spec.type === 'tiger') { obj = makeTiger(); a.speed = 1.05; }
     else if (spec.type === 'rabbit') { obj = makeRabbit(); a.speed = 2.2; }
     else if (spec.type === 'duck') { obj = makeDuck(); a.speed = 0.6; }
     else if (spec.type === 'squirrel') { obj = makeSquirrel(); a.speed = 3.2; }
@@ -585,7 +505,7 @@ export class Animals {
     } else if (spec.type === 'fish') {
       const schools = this._fishSchools || (this._fishSchools = new Map());
       const key = a.island.id;
-      if (!schools.has(key) || schools.get(key).size >= 3) {
+      if (!schools.has(key) || schools.get(key).size >= 4) {
         const radius = 6 + rng() * 3;
         schools.set(key, { center: this._shoalCenter(a.island, radius, -0.45, -2.4), radius, angle: rng() * Math.PI * 2, dir: rng() < 0.5 ? 1 : -1, size: 0 });
       }
@@ -607,21 +527,11 @@ export class Animals {
     } else if (spec.type === 'crab') {
       obj.position.copy(this._beachPoint(a.island));
       a.target = this._beachPoint(a.island, obj.position);
-    } else if (spec.type === 'tiger') {
-      let p = this._highlandPoint(a.island);
-      for (let n = 0; n < 8; n++) {
-        const crowded = this.list.some((b) => b.type === 'tiger' && Math.hypot(b.obj.position.x - p.x, b.obj.position.z - p.z) < 16);
-        if (!crowded) break;
-        p = this._highlandPoint(a.island);
-      }
-      obj.position.copy(p);
-      a.target = this._highlandPoint(a.island, obj.position);
     } else {
       obj.position.copy(this._landPoint(a.island));
       a.target = this._landPoint(a.island, obj.position);
     }
     if (spec.type === 'deer') obj.scale.setScalar(0.95 + rng() * 0.2);
-    if (spec.type === 'tiger') obj.scale.setScalar(1.05 + rng() * 0.2);
     const info = { ...INFO[spec.type], id: `${spec.type}-${this.list.length}` };
     obj.traverse((o) => { o.userData.pick = info; });
     a.obj = obj;
@@ -663,8 +573,7 @@ export class Animals {
         if (a.type === 'peacock') a.display = Math.min(1, a.display + dt * 0.8);
         if (a.timer <= 0) {
           a.state = 'move';
-          a.target = a.type === 'tiger' ? this._highlandPoint(a.island, o.position)
-            : SWIMMERS.has(a.type) ? this._waterPoint(a.island, o.position)
+          a.target = SWIMMERS.has(a.type) ? this._waterPoint(a.island, o.position)
             : a.type === 'crab' ? this._beachPoint(a.island, o.position) : this._landPoint(a.island, o.position);
         }
       } else {
@@ -684,9 +593,9 @@ export class Animals {
           let diff = yaw - o.rotation.y;
           diff = Math.atan2(Math.sin(diff), Math.cos(diff));
           o.rotation.y += diff * Math.min(1, dt * 3);
-          if (a.type === 'deer' || a.type === 'tiger') {
-            const ph = (t + a.phase) * (a.type === 'tiger' ? 4.2 : 6);
-            const amp = a.type === 'tiger' ? 0.35 : 0.45;
+          if (a.type === 'deer') {
+            const ph = (t + a.phase) * 6;
+            const amp = 0.45;
             o.userData.parts.legs.forEach((leg, i) => { leg.rotation.x = Math.sin(ph + (i % 2 ? Math.PI : 0) + (i > 1 ? Math.PI / 2 : 0)) * amp; });
             if (a.type === 'deer') o.userData.parts.neck.rotation.x = THREE.MathUtils.lerp(o.userData.parts.neck.rotation.x, 0, dt * 2);
           }
@@ -714,9 +623,7 @@ export class Animals {
   _animate(a, dt, t) {
     const parts = a.obj.userData.parts;
     const moving = a.state === 'move';
-    if (a.type === 'tiger') {
-      parts.tail.rotation.y = Math.sin(t * 1.6 + a.phase) * 0.35;
-    } else if (a.type === 'squirrel') {
+    if (a.type === 'squirrel') {
       parts.tail.rotation.x = -0.2 + Math.sin(t * (moving ? 10 : 3) + a.phase) * 0.15;
     } else if (a.type === 'peacock') {
       const k = a.display * a.display * (3 - 2 * a.display);
