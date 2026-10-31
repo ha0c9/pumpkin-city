@@ -3,6 +3,10 @@
 import { ROAD_STYLE } from '../config/city.layout.js';
 import { mergeColored, mulberry32, mergeSimple, makeCanvas, canvasTexture } from '../core/Utils.js';
 import { signalState } from './StreetFurniture.js';
+import {
+  AMBULANCE_LENGTH, AMBULANCE_WIDTH, ambulanceBodyGeometry, ambulanceSignGeometry,
+  ambulanceLampGeometry, redCrossMap,
+} from './ambulanceModel.js';
 
 const THREE = window.THREE;
 
@@ -11,6 +15,7 @@ const CAR_TYPES = {
   suv: { name: '越野车', nameEn: 'SUV', length: 4.8, colors: [0xf1f1ee, 0x2b2e33, 0x3e5f3a, 0x1f3e66], weight: 3 },
   // Replaces the old gray sedans and SUVs. White body, blue stripe, roof light bar.
   police: { name: '警车', nameEn: 'Police Cruiser', length: 4.7, colors: [0xffffff], weight: 2 },
+  ambulance: { name: '救护车', nameEn: 'Ambulance', length: AMBULANCE_LENGTH, colors: [0xffffff], weight: 0 },
   taxi: { name: '出租车', nameEn: 'Taxi', length: 4.5, colors: [0xf2c21b], weight: 2 },
   bus: { name: '公交车', nameEn: 'City Bus', length: 11, colors: [0x2f8f4a], weight: 0 },
 };
@@ -132,6 +137,7 @@ function carGeometry(type) {
     for (const z of [wz, -wz]) for (const x of [-W / 2 + 0.08, W / 2 - 0.08]) wheel(x, z, 0.34);
     return mergeColored(parts);
   }
+  if (type === 'ambulance') return ambulanceBodyGeometry();
   const L = type === 'suv' ? 4.8 : 4.5, W = type === 'suv' ? 1.95 : 1.8;
   const baseH = type === 'suv' ? 0.95 : 0.7, cabH = type === 'suv' ? 0.75 : 0.6;
   const y0 = type === 'suv' ? 0.42 : 0.3;
@@ -152,9 +158,9 @@ function carGeometry(type) {
 
 /** Head (front, warm white) and tail (rear, red) light quads for one vehicle type. */
 function lightGeometry(type, front) {
-  const L = type === 'bus' ? 11 : type === 'suv' ? 4.8 : type === 'police' ? 4.7 : 4.5;
-  const W = type === 'bus' ? 2.5 : type === 'suv' ? 1.95 : type === 'police' ? 1.86 : 1.8;
-  const y = type === 'bus' ? 0.95 : type === 'suv' ? 0.95 : type === 'police' ? 0.72 : 0.75;
+  const L = type === 'bus' ? 11 : type === 'suv' ? 4.8 : type === 'police' ? 4.7 : type === 'ambulance' ? AMBULANCE_LENGTH : 4.5;
+  const W = type === 'bus' ? 2.5 : type === 'suv' ? 1.95 : type === 'police' ? 1.86 : type === 'ambulance' ? AMBULANCE_WIDTH : 1.8;
+  const y = type === 'bus' ? 0.95 : type === 'suv' ? 0.95 : type === 'police' ? 0.72 : type === 'ambulance' ? 0.85 : 0.75;
   const geos = [];
   for (const sx of [-1, 1]) {
     const g = new THREE.BoxGeometry(0.36, 0.14, 0.05);
@@ -251,6 +257,7 @@ export class Traffic {
     const plan = [];
     const buses = count >= 40 ? BUS_ROUTES.length * 2 : BUS_ROUTES.length;
     for (let i = 0; i < count; i++) plan.push(i < buses ? 'bus' : pickType());
+    for (let i = 0; i < 3; i++) plan.push('ambulance');
     const bodyMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.55, envMapIntensity: 1.2 });
     this.ctx.wetMaterials.push({ material: bodyMat, dry: 0.35, wet: 0.15 });
     const headMat = new THREE.MeshStandardMaterial({ color: 0xfff6dd, emissive: 0xfff0c8, emissiveIntensity: 0.1 });
@@ -295,6 +302,21 @@ export class Traffic {
         policeBlue = new THREE.InstancedMesh(policeLampGeometry(false), blueMat, n);
         extras.push(policeSign, policeRed, policeBlue);
       }
+      let ambSign = null;
+      let ambRed = null;
+      let ambRed2 = null;
+      if (type === 'ambulance') {
+        const map = redCrossMap();
+        const mat = new THREE.MeshStandardMaterial({ map, roughness: 0.45, metalness: 0.05 });
+        ambSign = new THREE.InstancedMesh(ambulanceSignGeometry(), mat, n);
+        const redMat = new THREE.MeshStandardMaterial({ color: 0xd0121a, emissive: 0xff1a1a, emissiveIntensity: 0.4 });
+        const redMat2 = new THREE.MeshStandardMaterial({ color: 0xd0121a, emissive: 0xff1a1a, emissiveIntensity: 0.4 });
+        this.ambRedMat = redMat;
+        this.ambRedMat2 = redMat2;
+        ambRed = new THREE.InstancedMesh(ambulanceLampGeometry(true), redMat, n);
+        ambRed2 = new THREE.InstancedMesh(ambulanceLampGeometry(false), redMat2, n);
+        extras.push(ambSign, ambRed, ambRed2);
+      }
       for (const m of extras) { m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; this.group.add(m); }
       const def = CAR_TYPES[type];
       const infos = [];
@@ -314,6 +336,10 @@ export class Traffic {
           car.sign = policeSign; car.signIndex = i;
           car.lampRed = policeRed; car.lampBlue = policeBlue;
         }
+        if (ambSign) {
+          car.sign = ambSign; car.signIndex = i;
+          car.lampRed = ambRed; car.lampBlue = ambRed2;
+        }
         infos.push(route ? {
           id: `bus-${route.no}-${i}`, name: `${route.no}路公交车`, nameEn: `Bus Route ${route.no}`, category: '交通 Traffic',
           description: `${route.no}路：${route.from} ⇄ ${route.to}。车头、车尾和车身两侧的 LED 路牌显示线路号，经桥梁往返各岛。`,
@@ -321,7 +347,9 @@ export class Traffic {
           id: `car-${type}-${i}`, name: def.name, nameEn: def.nameEn, category: '交通 Traffic',
           description: type === 'police'
             ? '南瓜岛动物城警察局的巡逻车：白车身、蓝条纹和车顶警灯，沿南瓜中心岛的街道巡逻，也会过桥但会绕回来。'
-            : '行驶在南瓜岛道路上的车辆，遵守红绿灯并保持车距。',
+            : type === 'ambulance'
+              ? '从南瓜岛医院出发的救护车：白车身、红十字和车顶红灯，先沿雾林路、北原路离开医院，再驶入城市。'
+              : '行驶在南瓜岛道路上的车辆，遵守红绿灯并保持车距。',
         });
       }
       body.instanceColor.needsUpdate = true;
@@ -338,6 +366,7 @@ export class Traffic {
       const downtown = roadEdges.filter((e) => Math.abs(e.p0.x) < 170 && Math.abs(e.p0.z) < 160 && Math.abs(e.p1.x) < 170 && Math.abs(e.p1.z) < 160);
       if (downtown.length) pool = downtown;
     }
+    if (type === 'ambulance') return this._spawnAmbulance(def, roadEdges);
     let e, s;
     for (let k = 0; k < 60; k++) {
       e = pool[Math.floor(this.rng() * pool.length)];
@@ -350,6 +379,37 @@ export class Traffic {
       type, length: def.length, edge: e, s, off: this._laneOffset(e.lanes), curve: null, curveLen: 0,
       speed: 0, vmax: (type === 'bus' ? 9 : type === 'police' ? 10 : 11) + this.rng() * 3, pos: new THREE.Vector3(), dir: e.dir.clone(),
       wait: 0, patrol: type === 'police',
+    };
+    this._edgePoint(e, s, car.off, car.pos);
+    this.cars.push(car);
+    return car;
+  }
+
+  /** Ambulances leave the hospital: two on 雾林路 heading toward 北原路, one already turning south for the bridge. */
+  _spawnAmbulance(def, roadEdges) {
+    const starts = [
+      { road: 'wulin', axis: 'x', sign: -1, at: 12 },
+      { road: 'wulin', axis: 'x', sign: -1, at: -18 },
+      { road: 'beiyuan', axis: 'z', sign: 1, at: -460 },
+    ];
+    const spec = starts[(this._ambI = (this._ambI || 0) + 1) - 1] || starts[0];
+    const covers = (e) => {
+      const dir = spec.axis === 'x' ? e.dir.x : e.dir.z;
+      if (e.road?.id !== spec.road || dir * spec.sign < 0.5) return false;
+      const a = spec.axis === 'x' ? e.p0.x : e.p0.z;
+      const b = spec.axis === 'x' ? e.p1.x : e.p1.z;
+      const lo = Math.min(a, b), hi = Math.max(a, b);
+      return spec.at >= lo - 1 && spec.at <= hi + 1;
+    };
+    let e = roadEdges.find(covers) || roadEdges[0];
+    const origin = spec.axis === 'x' ? e.p0.x : e.p0.z;
+    const dir = spec.axis === 'x' ? e.dir.x : e.dir.z;
+    let s = dir ? (spec.at - origin) / dir : e.len * 0.5;
+    s = Math.max(3, Math.min(e.len - 3, s));
+    const car = {
+      type: 'ambulance', length: def.length, edge: e, s, off: this._laneOffset(e.lanes), curve: null, curveLen: 0,
+      speed: 0, vmax: 12 + this.rng() * 2, pos: new THREE.Vector3(), dir: e.dir.clone(),
+      wait: 0, patrol: false,
     };
     this._edgePoint(e, s, car.off, car.pos);
     this.cars.push(car);
@@ -459,6 +519,11 @@ export class Traffic {
       const f = 0.5 + 0.5 * Math.sin(time * 14);
       this.policeRedMat.emissiveIntensity = 0.25 + f * 2.8;
       this.policeBlueMat.emissiveIntensity = 0.25 + (1 - f) * 2.8;
+    }
+    if (this.ambRedMat) {
+      const f = 0.5 + 0.5 * Math.sin(time * 12);
+      this.ambRedMat.emissiveIntensity = 0.2 + f * 2.6;
+      this.ambRedMat2.emissiveIntensity = 0.2 + (1 - f) * 2.6;
     }
     for (const m of this.group.children) m.instanceMatrix.needsUpdate = true;
   }

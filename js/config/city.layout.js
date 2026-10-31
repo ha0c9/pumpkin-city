@@ -135,7 +135,7 @@ export const LANDMARKS = [
   {
     type: 'ghostMuseum', id: 'ghost-museum',
     name: '幽灵博物馆', nameEn: 'Ghost Museum',
-    description: '扭转的暗色塔身、悬浮的碎片与幽幽发光的裂缝，夜晚有幽灵在建筑周围游荡。展出世界各地的鬼怪传说。拱门里的降灵室可以走进去，里面有水晶球。',
+    description: '北原岛上的阴森小木屋：两层木板墙、门廊和二楼阳台，窗户透着暖光，屋顶趴着枯枝。门廊可以走进降灵室，里面有水晶球。夜里仍有幽灵在屋子周围飘。',
     position: [-104, -450], rotation: PI,
   },
   {
@@ -155,6 +155,12 @@ export const LANDMARKS = [
     name: '科技馆', nameEn: 'Science & Technology Museum',
     description: '悬浮的银色球幕影院、环形光带与参数化幕墙，展示航天、人工智能与新能源科技。正门门厅可以走进去，左侧实验台从门外看不见。',
     position: [-435, -108], rotation: 0,
+  },
+  {
+    type: 'hospital', id: 'pumpkin-hospital',
+    name: '南瓜岛医院', nameEn: 'Pumpkin Island Hospital',
+    description: '北原岛南端、雾林路南侧，原来的口袋公园改成了医院。东侧是三层门诊楼，西侧是八层病房楼，楼身有红十字。病房楼顶是直升机停机坪，一架救护直升机定时往返美国大厦 2 号楼的停机坪。西侧停车场停着救护车。',
+    position: [-10, -454], rotation: PI,
   },
   {
     type: 'planetarium', id: 'planetarium',
@@ -262,8 +268,7 @@ export const LOTS = {
     { position: [112, -98], rotation: PI, size: [58, 50] },
     // 东林岛
     { position: [448, 13], rotation: 0, size: [66, 38] },
-    // 北原岛
-    { position: [-10, -452], rotation: PI, size: [74, 60] },
+    // 北原岛（南端口袋公园已改为南瓜岛医院）
     { position: [-102, -532], rotation: 0, size: [60, 64] },
     // 西岭岛
     { position: [-440, -8], rotation: PI, size: [56, 56] },
@@ -313,10 +318,10 @@ export const ANIMALS = [
   // A few more, kept in the shallows rather than the offshore pods.
   { type: 'dolphin', count: 2, near: 'south', shallow: true },
   { type: 'dolphin', count: 2, near: 'east', shallow: true },
-  { type: 'fish', count: 3, near: 'south' },
-  { type: 'fish', count: 3, near: 'central' },
-  // Highland woods only: west ridge, north meadow, east grove hills.
-  { type: 'tiger', count: 2, island: 'west' },
-  { type: 'tiger', count: 2, island: 'north' },
-  { type: 'tiger', count: 1, island: 'east' },
+  { type: 'fish', count: 4, near: 'south' },
+  { type: 'fish', count: 4, near: 'central' },
+  { type: 'fish', count: 4, near: 'north' },
+  { type: 'fish', count: 4, near: 'west' },
+  { type: 'fish', count: 4, near: 'east' },
+  { type: 'fish', count: 4, near: 'pearl' },
 ];
