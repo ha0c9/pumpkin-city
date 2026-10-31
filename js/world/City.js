@@ -2,6 +2,7 @@
 import { LANDMARKS, LOTS, RANDOM_FACILITIES } from '../config/city.layout.js';
 import { getBuildingType } from '../core/Registry.js';
 import { mulberry32, mergeSimple } from '../core/Utils.js';
+import { addHalloween } from './Halloween.js';
 import '../buildings/index.js';
 
 const THREE = window.THREE;
@@ -94,6 +95,8 @@ export class City {
     }
     for (const lot of pools.large) this.place(fromLot('pocketPark', lot), rng);
     for (const lot of pools.small) this.place({ ...fromLot('cornerGarden', lot), footprint: null }, rng);
+    // Seasonal trim. Delete this call and js/world/Halloween.js to take the decorations down.
+    addHalloween(this);
   }
 
   /** Create a building from a spec ({ type, position: [x, z], rotation, size?, ... }) and add it to the world. */
