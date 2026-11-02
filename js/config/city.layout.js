@@ -18,13 +18,16 @@ export const ROAD_STYLE = {
  */
 export const ROADS = [
   // --- 南瓜中心岛: 5 x 5 downtown grid ---
-  { id: 'changning', name: '长宁路', nameEn: 'Changning Rd', from: [-75, -130], to: [150, -130], lanes: 2 },
-  { id: 'yuyuan', name: '愚园路', nameEn: 'Yuyuan Rd', from: [-150, -65], to: [150, -65], lanes: 2 },
+  { id: 'changning', name: '长宁路', nameEn: 'Changning Rd', from: [-150, -130], to: [150, -130], lanes: 2 },
+  // 愚园路 stops at 江苏路: west of that it would cut the pumpkin park in two.
+  { id: 'yuyuan', name: '愚园路', nameEn: 'Yuyuan Rd', from: [-75, -65], to: [150, -65], lanes: 2 },
   { id: 'pumpkin-ave', name: '南瓜大道', nameEn: 'Pumpkin Ave', from: [-150, 0], to: [150, 0], lanes: 4 },
   { id: 'wuyi', name: '武夷路', nameEn: 'Wuyi Rd', from: [-150, 65], to: [150, 65], lanes: 2 },
   { id: 'yanan', name: '延安西路', nameEn: "W. Yan'an Rd", from: [-150, 130], to: [75, 130], lanes: 2 },
-  { id: 'dingxi', name: '定西路', nameEn: 'Dingxi Rd', from: [-150, -65], to: [-150, 130], lanes: 2 },
-  { id: 'jiangsu', name: '江苏路', nameEn: 'Jiangsu Rd', from: [-75, -130], to: [-75, 130], lanes: 2 },
+  // 定西路 runs up to 长宁路 so the park's west side is a road, not open grass.
+  { id: 'dingxi', name: '定西路', nameEn: 'Dingxi Rd', from: [-150, -130], to: [-150, 130], lanes: 2 },
+  // 江苏路 starts at 愚园路. North of that it would split the tree court from the market.
+  { id: 'jiangsu', name: '江苏路', nameEn: 'Jiangsu Rd', from: [-75, -65], to: [-75, 130], lanes: 2 },
   { id: 'zhongshan', name: '中山路', nameEn: 'Zhongshan Rd', from: [0, -130], to: [0, 130], lanes: 4 },
   { id: 'huashan', name: '华山路', nameEn: 'Huashan Rd', from: [75, -130], to: [75, 130], lanes: 2 },
   { id: 'panyu', name: '番禺路', nameEn: 'Panyu Rd', from: [150, -130], to: [150, 65], lanes: 2 },
@@ -99,6 +102,25 @@ export const LANDMARKS = [
     name: '世界遗产博物馆', nameEn: 'World Heritage Museum',
     description: '新古典主义柱廊立面搭配玻璃穹顶，收藏来自世界各地的文化与自然遗产展品。',
     position: [39, -98], rotation: 0,
+  },
+  {
+    type: 'pumpkinPark', id: 'pumpkin-park-tree',
+    kind: 'tree',
+    name: '南瓜公园', nameEn: 'Pumpkin Park',
+    description: '南瓜公园西北侧。金色五角星铺地，中央一棵很高的圣诞树，挂满彩灯。东边连着市集，南边连着冰场，中间没有马路。',
+    position: [-104.7, -96.75], rotation: 0, footprint: [75.4, 51.3],
+  },
+  {
+    type: 'pumpkinPark', id: 'pumpkin-park-garden',
+    kind: 'garden',
+    description: '南瓜公园南侧，对着南瓜大道。有溜冰场、雪人、雪橇和热可可亭，北面直接连着圣诞树广场。',
+    position: [-112.5, -41.3], rotation: 0, footprint: [59.8, 60.4],
+  },
+  {
+    type: 'pumpkinPark', id: 'pumpkin-park-market',
+    kind: 'market',
+    description: '南瓜公园东北地块，愚园路以北、江苏路与中山路之间。雪顶小屋朝西对着圣诞树，旁边是红白摊位、灯拱和旋转木马。',
+    position: [-39.25, -97.5], rotation: 0, footprint: [56.3, 49.8],
   },
   {
     type: 'school', id: 'jiangsu-road-no2',
@@ -259,8 +281,10 @@ export const RANDOM_FACILITIES = {
 
 export const LOTS = {
   large: [
-    lot(block(-150, -75, -65, 0, { b: 4 }), 0),
-    lot(block(-75, 0, -130, -65, { r: 4 }), PI),
+    // These two lots are 南瓜公园. They stay in the list so the seeded shuffle still
+    // hands the same other lots to construction sites and pocket parks.
+    { ...lot(block(-150, -75, -65, 0, { b: 4 }), 0), reserved: true },
+    { ...lot(block(-75, 0, -130, -65, { r: 4 }), PI), reserved: true },
     lot(block(-75, 0, 0, 65, { r: 4, t: 4 }), PI),
     lot(block(-75, 0, 65, 130, { r: 4 }), 0),
     lot(block(0, 75, 65, 130, { l: 4 }), 0),
