@@ -170,26 +170,27 @@ function litTree(group, x, z, scale, golds, reds, whites) {
 }
 
 function giantTree(group, golds, reds, whites) {
-  mesh(group, new THREE.CylinderGeometry(0.55, 0.8, 2.6, 8), woodDark, 0, 1.3, 0);
+  mesh(group, new THREE.CylinderGeometry(0.7, 1.05, 3.4, 8), woodDark, 0, 1.7, 0);
   const layers = [
-    [6.4, 4.6, 4.4, leaf],
-    [5.1, 4.0, 7.4, leafDark],
-    [3.8, 3.6, 10.2, leaf],
-    [2.6, 3.1, 12.6, leafDark],
-    [1.5, 2.5, 14.8, leaf],
+    [10.6, 7.2, 6.8, leaf],
+    [8.4, 6.2, 12.0, leafDark],
+    [6.4, 5.4, 16.8, leaf],
+    [4.6, 4.6, 21.0, leafDark],
+    [3.0, 3.8, 24.6, leaf],
+    [1.6, 2.8, 27.4, leafDark],
   ];
   for (const [rad, h, y, mat] of layers) {
     mesh(group, new THREE.ConeGeometry(rad, h, 10), mat, 0, y, 0);
-    const n = Math.round(10 + rad);
+    const n = Math.round(8 + rad);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + y;
       const list = i % 3 === 0 ? reds : i % 3 === 1 ? golds : whites;
-      list.push([Math.cos(a) * rad * 0.72, y - h * 0.05, Math.sin(a) * rad * 0.72, 1.7]);
+      list.push([Math.cos(a) * rad * 0.7, y - h * 0.05, Math.sin(a) * rad * 0.7, 1.9]);
     }
   }
-  const star = mesh(group, new THREE.OctahedronGeometry(1.35, 0), bulbGold, 0, 16.8, 0);
+  const star = mesh(group, new THREE.OctahedronGeometry(1.7, 0), bulbGold, 0, 29.6, 0);
   star.castShadow = false;
-  mesh(group, new THREE.ConeGeometry(1.15, 1.1, 4), snow, 0, 15.9, 0).castShadow = false;
+  mesh(group, new THREE.ConeGeometry(1.4, 1.3, 4), snow, 0, 28.4, 0).castShadow = false;
 }
 
 function gifts(group) {
@@ -242,47 +243,156 @@ function posts(group, golds, reds, whites, corners, y, droop) {
   }
 }
 
-function parkSignAndLawn(group, w, d) {
+function parkSignAndLawn(group, w, d, edges = 'nsew') {
   lawn(group, w, d);
   const curb = sharedMaterial('stone');
-  box(group, w, 0.22, 0.45, 0, 0.16, d / 2 - 0.25, curb, { cast: false });
-  box(group, w, 0.22, 0.45, 0, 0.16, -d / 2 + 0.25, curb, { cast: false });
-  box(group, 0.45, 0.22, d, w / 2 - 0.25, 0.16, 0, curb, { cast: false });
-  box(group, 0.45, 0.22, d, -w / 2 + 0.25, 0.16, 0, curb, { cast: false });
+  if (edges.includes('s')) box(group, w, 0.22, 0.45, 0, 0.16, d / 2 - 0.25, curb, { cast: false });
+  if (edges.includes('n')) box(group, w, 0.22, 0.45, 0, 0.16, -d / 2 + 0.25, curb, { cast: false });
+  if (edges.includes('e')) box(group, 0.45, 0.22, d, w / 2 - 0.25, 0.16, 0, curb, { cast: false });
+  if (edges.includes('w')) box(group, 0.45, 0.22, d, -w / 2 + 0.25, 0.16, 0, curb, { cast: false });
+}
+
+// A thin same-color strip just above the lawn, so two courts that overlap don't z-fight along the join.
+function seamCap(group, w, d, x, z) {
+  box(group, w, 0.02, d, x, 0.17, z, lawnMat, { cast: false, receive: false });
+}
+
+function iceRink(group, x, z, golds, whites) {
+  const ice = new THREE.Mesh(new THREE.CircleGeometry(6.4, 36), new THREE.MeshBasicMaterial({ color: 0x3aa0c8 }));
+  ice.rotation.x = -Math.PI / 2;
+  ice.position.set(x, 0.22, z);
+  ice.receiveShadow = true;
+  group.add(ice);
+  const crease = new THREE.Mesh(new THREE.RingGeometry(1.3, 1.5, 24), new THREE.MeshBasicMaterial({ color: 0xf4fbff }));
+  crease.rotation.x = -Math.PI / 2;
+  crease.position.set(x, 0.24, z);
+  group.add(crease);
+  box(group, 0.12, 0.02, 8, x, 0.25, z, new THREE.MeshBasicMaterial({ color: 0xf4fbff }), { cast: false });
+  const railMat = colorMat(0xe7eef2, { metalness: 0.45, roughness: 0.35 });
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    mesh(group, new THREE.CylinderGeometry(0.06, 0.07, 0.85, 5), sharedMaterial('darkSteel'), x + Math.cos(a) * 6.5, 0.55, z + Math.sin(a) * 6.5);
+    whites.push([x + Math.cos(a) * 6.5, 1.05, z + Math.sin(a) * 6.5, 0.7]);
+    if (i % 2 === 0) golds.push([x + Math.cos(a) * 5.2, 0.4, z + Math.sin(a) * 5.2, 0.55]);
+  }
+  for (let i = 0; i < 12; i++) {
+    const a0 = (i / 12) * Math.PI * 2;
+    const a1 = ((i + 1) / 12) * Math.PI * 2;
+    const mx = x + Math.cos((a0 + a1) / 2) * 6.5;
+    const mz = z + Math.sin((a0 + a1) / 2) * 6.5;
+    const rail = box(group, 3.3, 0.08, 0.08, mx, 0.95, mz, railMat);
+    rail.rotation.y = -a0 + Math.PI / 2;
+  }
+}
+
+function snowman(group, x, z) {
+  const white = colorMat(0xf7fbff, { roughness: 0.45 });
+  mesh(group, new THREE.SphereGeometry(0.62, 10, 8), white, x, 0.62, z);
+  mesh(group, new THREE.SphereGeometry(0.44, 10, 8), white, x, 1.4, z);
+  mesh(group, new THREE.SphereGeometry(0.3, 10, 8), white, x, 1.95, z);
+  mesh(group, new THREE.CylinderGeometry(0.34, 0.34, 0.08, 8), colorMat(0x1c1c1c, { roughness: 0.6 }), x, 2.28, z);
+  mesh(group, new THREE.CylinderGeometry(0.2, 0.22, 0.38, 8), colorMat(0x1c1c1c, { roughness: 0.6 }), x, 2.5, z);
+  const nose = mesh(group, new THREE.ConeGeometry(0.07, 0.38, 6), colorMat(0xf08a2a, { roughness: 0.5 }), x, 1.95, z + 0.32);
+  nose.rotation.x = Math.PI / 2;
+  box(group, 0.7, 0.12, 0.16, x, 1.45, z, redCloth);
+}
+
+function sleigh(group, x, z, rot) {
+  const g = new THREE.Group();
+  box(g, 3.4, 0.7, 1.35, 0.2, 0.95, 0, redCloth);
+  box(g, 0.16, 1.15, 1.35, -1.4, 1.35, 0, redCloth);
+  box(g, 0.9, 0.55, 0.7, 0.5, 1.4, 0, colorMat(0x1c7a34, { roughness: 0.55 }));
+  box(g, 0.7, 0.45, 0.55, -0.4, 1.3, 0.15, colorMat(0xd4af37, { roughness: 0.45 }));
+  for (const sz of [-0.55, 0.55]) {
+    box(g, 3.8, 0.1, 0.12, 0, 0.32, sz, goldTrim);
+    const curl = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.05, 5, 8, Math.PI), goldTrim);
+    curl.position.set(1.85, 0.55, sz);
+    curl.rotation.y = Math.PI / 2;
+    g.add(curl);
+  }
+  g.position.set(x, 0, z);
+  g.rotation.y = rot;
+  group.add(g);
+}
+
+function cocoaHut(group, x, z) {
+  const g = new THREE.Group();
+  mesh(g, new THREE.CylinderGeometry(2.15, 2.3, 2.5, 10), colorMat(0x8d4b2e, { roughness: 0.75 }), 0, 1.35, 0);
+  mesh(g, new THREE.ConeGeometry(2.7, 1.6, 10), new THREE.MeshBasicMaterial({ color: 0xc0392b }), 0, 3.2, 0);
+  mesh(g, new THREE.ConeGeometry(2.85, 0.28, 10), snow, 0, 2.45, 0);
+  const win = new THREE.Mesh(new THREE.CircleGeometry(0.55, 12), windowGlow);
+  win.position.set(0, 1.45, 2.28);
+  g.add(win);
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.7), new THREE.MeshStandardMaterial({
+    map: textTexture(['热可可'], {
+      width: 512, height: 160, bg: '#7d1d24', color: '#ffe7a3',
+      font: `bold 92px ${FONT}`,
+    }),
+    roughness: 0.55,
+    side: THREE.DoubleSide,
+  }));
+  board.position.set(0, 2.15, 2.35);
+  g.add(board);
+  g.position.set(x, 0, z);
+  group.add(g);
+}
+
+function candyArch(group, x, z, golds, reds) {
+  for (const sx of [-1.6, 1.6]) {
+    for (let i = 0; i < 6; i++) {
+      box(group, 0.28, 0.42, 0.28, x + sx, 0.3 + i * 0.42, z, i % 2 ? redCloth : snow);
+    }
+  }
+  for (let i = 0; i <= 8; i++) {
+    const t = Math.PI * (i / 8);
+    const px = x + Math.cos(t) * 1.6;
+    const py = 2.7 + Math.sin(t) * 1.15;
+    (i % 2 ? reds : golds).push([px, py, z, 1.05]);
+  }
 }
 
 function buildGarden(group, spec, rng, golds, reds, whites) {
   const [W, D] = spec.footprint;
-  parkSignAndLawn(group, W, D);
-  disk(group, 9.5, 0, 0.2, -1, sharedMaterial('paving'));
-  disk(group, 7.2, 0, 0.22, -1, colorMat(0xe7e0d4, { roughness: 0.85 }));
-  const jet = fountain(group, 0, -1, 1.15);
-  flowerBed(group, -16, -12, 8, 5, rng);
-  flowerBed(group, 16, -12, 8, 5, rng);
-  flowerBed(group, -16, 10, 7, 4.5, rng);
-  flowerBed(group, 16, 10, 7, 4.5, rng);
-  const spots = [[-20, -6], [20, -6], [-20, 8], [20, 8], [-8, 14], [8, 14], [0, -16]];
-  for (const [x, z] of spots) litTree(group, x, z, 1.15, golds, reds, whites);
-  posts(group, golds, reds, whites, [[-22, -16], [22, -16], [22, 16], [-22, 16]], 4.2, 0.7);
-  bench(group, -10, 6, 0);
-  bench(group, 10, 6, Math.PI);
-  bench(group, -10, -10, Math.PI / 2);
+  // North side joins the tree court, so that edge stays open.
+  parkSignAndLawn(group, W, D, 'swe');
+  seamCap(group, W, 1.8, 0, -D / 2 + 0.2);
+  box(group, 3.4, 0.08, D - 8, -6, 0.2, 0, sharedMaterial('paving'), { cast: false });
+  iceRink(group, 9, 2, golds, whites);
+  sleigh(group, 9, -14, -0.5);
+  snowman(group, 1, 14);
+  cocoaHut(group, -16, 8);
+  candyArch(group, -6, -16, golds, reds);
+  const jet = fountain(group, -16, -12, 0.75);
+  flowerBed(group, 18, 16, 7, 4, rng);
+  flowerBed(group, 20, -8, 5, 6, rng);
+  flowerBed(group, -4, 18, 8, 3.4, rng);
+  for (const [x, z, s] of [[-22, -4, 1.2], [-22, 16, 1.05], [-10, -20, 0.9], [20, 6, 1.1], [16, -20, 0.95]]) {
+    litTree(group, x, z, s, golds, reds, whites);
+  }
+  posts(group, golds, reds, whites, [[-20, -22], [22, -22], [22, 20], [-22, 20]], 4.2, 0.75);
+  bench(group, 2, -8, Math.PI / 2);
+  bench(group, 16, 12, 0.6);
+  bench(group, -8, 6, Math.PI);
   sign(group, 0, D / 2 - 1.4, 0);
-  return { jets: [jet], spinner: null, height: 6 };
+  return { jets: [jet], spinner: null, height: 8 };
 }
 
 function buildTree(group, spec, rng, golds, reds, whites) {
   const [W, D] = spec.footprint;
-  parkSignAndLawn(group, W, D);
-  const ring = new THREE.Mesh(new THREE.RingGeometry(16.2, 17.6, 48), new THREE.MeshBasicMaterial({ color: 0xc0392b }));
+  // East joins the market, south joins the rink court.
+  parkSignAndLawn(group, W, D, 'nw');
+  // Only as far south as the market, so the cap stays off the 愚园路 junction.
+  seamCap(group, 1.8, 49.8, W / 2 - 0.2, -0.75);
+  box(group, 12, 0.22, 0.45, 29, 0.16, D / 2 - 0.25, sharedMaterial('stone'), { cast: false });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(18.2, 19.6, 48), new THREE.MeshBasicMaterial({ color: 0xc0392b }));
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = 0.2;
   ring.receiveShadow = true;
   group.add(ring);
-  disk(group, 16.2, 0, 0.22, 0, starPlazaMat());
+  disk(group, 18.2, 0, 0.22, 0, starPlazaMat());
   giantTree(group, golds, reds, whites);
   gifts(group);
-  const jet = fountain(group, 14, 13, 0.85);
+  const jet = fountain(group, 24, 8, 0.85);
   flowerBed(group, -20, 14, 7, 4, rng);
   flowerBed(group, 20, -14, 6, 4, rng);
   for (const [x, z] of [[-22, -16], [22, -16], [-22, 16], [22, 12]]) litTree(group, x, z, 1.05, golds, reds, whites);
@@ -296,8 +406,11 @@ function buildTree(group, spec, rng, golds, reds, whites) {
     const a = (i * Math.PI) / 2;
     bench(group, Math.cos(a) * 12.2, Math.sin(a) * 12.2, -a + Math.PI);
   }
-  sign(group, 0, D / 2 - 1.4, 0);
-  return { jets: [jet], spinner: null, height: 24 };
+  // Walks that meet the rink court (south) and the market (east).
+  box(group, 3.2, 0.08, 8, -11.6, 0.2, 20.5, sharedMaterial('paving'), { cast: false });
+  box(group, 16, 0.08, 3.2, 28, 0.2, -0.75, sharedMaterial('paving'), { cast: false });
+  sign(group, 0, -D / 2 + 1.4, Math.PI);
+  return { jets: [jet], spinner: null, height: 32 };
 }
 
 function stall(group, x, z, rot) {
@@ -397,7 +510,9 @@ function lightArch(group, x, z, rot, golds, reds, whites) {
 
 function buildMarket(group, spec, rng, golds, reds, whites) {
   const [W, D] = spec.footprint;
-  parkSignAndLawn(group, W, D);
+  // West side joins the tree court.
+  parkSignAndLawn(group, W, D, 'nse');
+  box(group, 16, 0.08, 3.2, -18, 0.2, 0, sharedMaterial('paving'), { cast: false });
   // Lodge on the west side, facing the tree. Stalls and the carousel fill the east side.
   box(group, 3.2, 0.08, 30, 6, 0.2, 2, sharedMaterial('paving'), { cast: false });
   box(group, 24, 0.08, 3.2, 4, 0.2, 8, sharedMaterial('paving'), { cast: false });

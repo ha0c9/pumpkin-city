@@ -18,13 +18,16 @@ export const ROAD_STYLE = {
  */
 export const ROADS = [
   // --- 南瓜中心岛: 5 x 5 downtown grid ---
-  { id: 'changning', name: '长宁路', nameEn: 'Changning Rd', from: [-75, -130], to: [150, -130], lanes: 2 },
-  { id: 'yuyuan', name: '愚园路', nameEn: 'Yuyuan Rd', from: [-150, -65], to: [150, -65], lanes: 2 },
+  { id: 'changning', name: '长宁路', nameEn: 'Changning Rd', from: [-150, -130], to: [150, -130], lanes: 2 },
+  // 愚园路 stops at 江苏路: west of that it would cut the pumpkin park in two.
+  { id: 'yuyuan', name: '愚园路', nameEn: 'Yuyuan Rd', from: [-75, -65], to: [150, -65], lanes: 2 },
   { id: 'pumpkin-ave', name: '南瓜大道', nameEn: 'Pumpkin Ave', from: [-150, 0], to: [150, 0], lanes: 4 },
   { id: 'wuyi', name: '武夷路', nameEn: 'Wuyi Rd', from: [-150, 65], to: [150, 65], lanes: 2 },
   { id: 'yanan', name: '延安西路', nameEn: "W. Yan'an Rd", from: [-150, 130], to: [75, 130], lanes: 2 },
-  { id: 'dingxi', name: '定西路', nameEn: 'Dingxi Rd', from: [-150, -65], to: [-150, 130], lanes: 2 },
-  { id: 'jiangsu', name: '江苏路', nameEn: 'Jiangsu Rd', from: [-75, -130], to: [-75, 130], lanes: 2 },
+  // 定西路 runs up to 长宁路 so the park's west side is a road, not open grass.
+  { id: 'dingxi', name: '定西路', nameEn: 'Dingxi Rd', from: [-150, -130], to: [-150, 130], lanes: 2 },
+  // 江苏路 starts at 愚园路. North of that it would split the tree court from the market.
+  { id: 'jiangsu', name: '江苏路', nameEn: 'Jiangsu Rd', from: [-75, -65], to: [-75, 130], lanes: 2 },
   { id: 'zhongshan', name: '中山路', nameEn: 'Zhongshan Rd', from: [0, -130], to: [0, 130], lanes: 4 },
   { id: 'huashan', name: '华山路', nameEn: 'Huashan Rd', from: [75, -130], to: [75, 130], lanes: 2 },
   { id: 'panyu', name: '番禺路', nameEn: 'Panyu Rd', from: [150, -130], to: [150, 65], lanes: 2 },
@@ -104,14 +107,14 @@ export const LANDMARKS = [
     type: 'pumpkinPark', id: 'pumpkin-park-tree',
     kind: 'tree',
     name: '南瓜公园', nameEn: 'Pumpkin Park',
-    description: '南瓜公园西北地块，愚园路以北、江苏路以西。金色五角星铺地，中央一棵挂满彩灯的大圣诞树。',
-    position: [-112.5, -97.5], rotation: 0, footprint: [59.8, 49.8],
+    description: '南瓜公园西北侧。金色五角星铺地，中央一棵很高的圣诞树，挂满彩灯。东边连着市集，南边连着冰场，中间没有马路。',
+    position: [-104.7, -96.75], rotation: 0, footprint: [75.4, 51.3],
   },
   {
     type: 'pumpkinPark', id: 'pumpkin-park-garden',
     kind: 'garden',
-    description: '南瓜公园西南地块，江苏路以西、愚园路与南瓜大道之间。圆形喷泉、红白花坛，一圈小圣诞树挂着灯。',
-    position: [-112.5, -34.25], rotation: 0, footprint: [59.8, 46.3],
+    description: '南瓜公园南侧，对着南瓜大道。有溜冰场、雪人、雪橇和热可可亭，北面直接连着圣诞树广场。',
+    position: [-112.5, -41.3], rotation: 0, footprint: [59.8, 60.4],
   },
   {
     type: 'pumpkinPark', id: 'pumpkin-park-market',
