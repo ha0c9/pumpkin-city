@@ -14,6 +14,7 @@ const FOOTPRINTS = {
   oceanGallery: [40, 34], scienceMuseum: [60, 60], americaTower2: [36, 33], planetarium: [116, 40],
   orientalPearl: [70, 70], fulaiTower: [40, 40],
   equestrianCenter: [74, 52], schoolAheadSign: [0.8, 0.8], airport: [200, 120],
+  pumpkinPark: [56, 46],
   subwayEntrance: [15, 12], hospital: [70, 54],
 };
 
@@ -75,7 +76,10 @@ for (const l of LANDMARKS) {
   const fp = l.footprint || FOOTPRINTS[l.type];
   checkRect(`landmark ${l.id}`, l.position[0], l.position[1], fp[0], fp[1], l.rotation || 0);
 }
-LOTS.large.forEach((l, i) => checkRect(`large lot #${i}`, l.position[0], l.position[1], l.size[0], l.size[1], 0));
+LOTS.large.forEach((l, i) => {
+  if (l.reserved) return;
+  checkRect(`large lot #${i}`, l.position[0], l.position[1], l.size[0], l.size[1], 0);
+});
 LOTS.small.forEach((l, i) => {
   const r = l.rotation || 0;
   const swap = Math.abs(Math.sin(r)) > 0.5;

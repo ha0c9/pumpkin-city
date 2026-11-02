@@ -26,4 +26,5 @@ import './ConstructionSite.js';
 import './Factory.js';
 import './Airport.js';
 import './Park.js';
+import './PumpkinPark.js';
 import './GltfModel.js';

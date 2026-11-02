@@ -90,9 +90,14 @@ export class City {
     let counter = 0;
     const fromLot = (type, lot) => ({ type, id: `${type}-${++counter}`, position: lot.position, rotation: lot.rotation, size: lot.size, footprint: lot.size });
     for (const pick of RANDOM_FACILITIES.picks) {
-      for (let i = 0; i < pick.count && pools[pick.lot].length; i++) this.place(fromLot(pick.type, pools[pick.lot].shift()), rng);
+      for (let i = 0; i < pick.count && pools[pick.lot].length; i++) {
+        const lot = pools[pick.lot].shift();
+        // A reserved lot still uses up its shuffle slot, so the other sites stay put.
+        if (lot.reserved) continue;
+        this.place(fromLot(pick.type, lot), rng);
+      }
     }
-    for (const lot of pools.large) this.place(fromLot('pocketPark', lot), rng);
+    for (const lot of pools.large) if (!lot.reserved) this.place(fromLot('pocketPark', lot), rng);
     for (const lot of pools.small) this.place({ ...fromLot('cornerGarden', lot), footprint: null }, rng);
   }
 

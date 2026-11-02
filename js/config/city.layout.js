@@ -101,6 +101,25 @@ export const LANDMARKS = [
     position: [39, -98], rotation: 0,
   },
   {
+    type: 'pumpkinPark', id: 'pumpkin-park-tree',
+    kind: 'tree',
+    name: '南瓜公园', nameEn: 'Pumpkin Park',
+    description: '南瓜公园西北地块，愚园路以北、江苏路以西。金色五角星铺地，中央一棵挂满彩灯的大圣诞树。',
+    position: [-112.5, -97.5], rotation: 0, footprint: [59.8, 49.8],
+  },
+  {
+    type: 'pumpkinPark', id: 'pumpkin-park-garden',
+    kind: 'garden',
+    description: '南瓜公园西南地块，江苏路以西、愚园路与南瓜大道之间。圆形喷泉、红白花坛，一圈小圣诞树挂着灯。',
+    position: [-112.5, -34.25], rotation: 0, footprint: [59.8, 46.3],
+  },
+  {
+    type: 'pumpkinPark', id: 'pumpkin-park-market',
+    kind: 'market',
+    description: '南瓜公园东北地块，愚园路以北、江苏路与中山路之间。雪顶小屋朝西对着圣诞树，旁边是红白摊位、灯拱和旋转木马。',
+    position: [-39.25, -97.5], rotation: 0, footprint: [56.3, 49.8],
+  },
+  {
     type: 'school', id: 'jiangsu-road-no2',
     name: '江苏路第二小学', nameEn: 'Jiangsu Road No.2 Primary School',
     description: '校门朝向江苏路，设有传达室。传达室可以从校园一侧走进去，仓鼠笼在门后的角落里，街上的窗户看不到。三层教学楼、钟楼、200 米环形跑道、足球场与升旗台。',
@@ -259,8 +278,10 @@ export const RANDOM_FACILITIES = {
 
 export const LOTS = {
   large: [
-    lot(block(-150, -75, -65, 0, { b: 4 }), 0),
-    lot(block(-75, 0, -130, -65, { r: 4 }), PI),
+    // These two lots are 南瓜公园. They stay in the list so the seeded shuffle still
+    // hands the same other lots to construction sites and pocket parks.
+    { ...lot(block(-150, -75, -65, 0, { b: 4 }), 0), reserved: true },
+    { ...lot(block(-75, 0, -130, -65, { r: 4 }), PI), reserved: true },
     lot(block(-75, 0, 0, 65, { r: 4, t: 4 }), PI),
     lot(block(-75, 0, 65, 130, { r: 4 }), 0),
     lot(block(0, 75, 65, 130, { l: 4 }), 0),
