@@ -5,6 +5,7 @@ import { CameraControls } from './CameraControls.js';
 import { Interaction } from './Interaction.js';
 import { GamepadInput } from './Gamepad.js';
 import { lerp, clamp } from './Utils.js';
+import { chunkStaticInstances, tagWaterLayers, LAYER_SUBMERGED } from './RenderCulling.js';
 import { collectTextures, disposeAppGpu, estimateGpu, releaseTextureCpu } from './gpuMemory.js';
 import { Terrain } from '../world/Terrain.js';
 import { Water, LAYER_DETAIL } from '../world/Water.js';
@@ -63,6 +64,7 @@ export class App {
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 7000);
     camera.layers.enable(LAYER_DETAIL);
+    camera.layers.enable(LAYER_SUBMERGED);
 
     const ctx = this.ctx = {
       renderer, scene, camera,
@@ -124,6 +126,8 @@ export class App {
 
     this.interaction = new Interaction(ctx, { terrain: this.terrain, bridges: this.bridges, water: this.water, controls: this.controls, ui });
     this._labelsAndPlaces();
+    chunkStaticInstances(ctx.scene, ctx.pickables, { skip: (o) => o.parent === this.traffic.group });
+    tagWaterLayers(ctx.scene, [this.traffic.group, this.animals.group, this.sky.mesh, this.water.mesh]);
 
     ui.progress(0.92, '编译着色器…'); await nextFrame();
     this.env.apply(0, true, camera, this.controls.focus);

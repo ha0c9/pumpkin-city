@@ -105,15 +105,22 @@ export function estimateGpu(app) {
   const gl = app.ctx.renderer.getContext();
   const fbBytes = gl.drawingBufferWidth * gl.drawingBufferHeight * 4;
   const seen = new Set();
+  const seenArrays = new Set();
   let geoBytes = 0;
   let geoCount = 0;
+  // Culling chunks share their source buffers, so count each array once.
+  const addArray = (a) => {
+    if (!a || !a.array || seenArrays.has(a.array)) return;
+    seenArrays.add(a.array);
+    geoBytes += a.array.byteLength;
+  };
   app.ctx.scene.traverse((o) => {
     const g = o.geometry;
     if (!g || seen.has(g)) return;
     seen.add(g);
     geoCount++;
-    for (const a of Object.values(g.attributes || {})) if (a && a.array) geoBytes += a.array.byteLength;
-    if (g.index && g.index.array) geoBytes += g.index.array.byteLength;
+    for (const a of Object.values(g.attributes || {})) addArray(a);
+    addArray(g.index);
   });
   const info = app.ctx.renderer.info.memory;
   const mb = (n) => (n / (1024 * 1024));

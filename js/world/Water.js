@@ -4,6 +4,7 @@ import { WATER, WAVES, TERRAIN, QUALITY } from '../config/world.config.js';
 import { RippleSimulation } from './RippleSimulation.js';
 import { NOISE_GLSL } from './Terrain.js';
 import { WaveSpectrum } from './WaveSpectrum.js';
+import { LAYER_UNDERWATER } from '../core/RenderCulling.js';
 
 const THREE = window.THREE;
 
@@ -504,10 +505,10 @@ export class Water {
     r.clear();
     r.render(scene, mc);
 
-    // Refraction: only what lies below (or barely above) the surface.
+    // Refraction: only what lies below (or barely above) the surface; see RenderCulling.tagWaterLayers.
     if (skyMesh) skyMesh.visible = false;
     const prevLayers = camera.layers.mask;
-    camera.layers.set(0);
+    camera.layers.set(LAYER_UNDERWATER);
     r.clippingPlanes = this.clipBelow;
     const deep = WATER.deepColor;
     r.setClearColor(new THREE.Color(deep[0], deep[1], deep[2]).multiplyScalar(0.6), 1);
