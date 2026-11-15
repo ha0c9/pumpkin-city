@@ -5,6 +5,7 @@ import { fbm, smoothstep, clamp } from '../core/Utils.js';
 import { IslandField } from './IslandField.js';
 
 const THREE = window.THREE;
+const TILE = 150; // meters per terrain tile
 
 export const CAUSTICS_GLSL = /* glsl */`
 float causticPattern(vec2 uv, float time) {
@@ -136,15 +137,59 @@ export class Terrain {
         colors[k * 3] = c.r; colors[k * 3 + 1] = c.g; colors[k * 3 + 2] = c.b;
       }
     }
-    geo.computeBoundingSphere();
-
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.93, metalness: 0 });
     this._patchMaterial(mat);
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.receiveShadow = true;
-    mesh.name = 'terrain';
-    mesh.userData.isTerrain = true;
-    return mesh;
+    const group = new THREE.Group();
+    group.name = 'terrain';
+    for (const tileGeo of this._tiles(geo, nx, Math.max(16, Math.round(TILE / cell)))) {
+      const mesh = new THREE.Mesh(tileGeo, mat);
+      mesh.receiveShadow = true;
+      mesh.name = 'terrain';
+      mesh.userData.isTerrain = true;
+      group.add(mesh);
+    }
+    geo.dispose();
+    return group;
+  }
+
+  /**
+   * Cut the grid into square tiles so each can be frustum culled (and dry or deep tiles skipped by the
+   * water passes). Normals and colors come from the full grid, so tile edges match exactly.
+   */
+  _tiles(geo, nx, tile) {
+    const index = geo.index.array;
+    const src = { position: geo.attributes.position.array, normal: geo.attributes.normal.array, color: geo.attributes.color.array };
+    const buckets = new Map();
+    for (let t = 0; t < index.length; t += 6) {
+      const a = index[t];
+      const key = Math.floor((a / nx | 0) / tile) * 4096 + Math.floor((a % nx) / tile);
+      let list = buckets.get(key);
+      if (!list) buckets.set(key, list = []);
+      for (let k = 0; k < 6; k++) list.push(index[t + k]);
+    }
+    const remap = new Int32Array(src.position.length / 3).fill(-1);
+    const out = [];
+    for (const list of buckets.values()) {
+      const used = [];
+      const idx = new Uint32Array(list.length);
+      for (let k = 0; k < list.length; k++) {
+        const v = list[k];
+        if (remap[v] < 0) { remap[v] = used.length; used.push(v); }
+        idx[k] = remap[v];
+      }
+      const g = new THREE.BufferGeometry();
+      for (const [name, arr] of Object.entries(src)) {
+        const a = new Float32Array(used.length * 3);
+        used.forEach((v, n) => { a[n * 3] = arr[v * 3]; a[n * 3 + 1] = arr[v * 3 + 1]; a[n * 3 + 2] = arr[v * 3 + 2]; });
+        g.setAttribute(name, new THREE.BufferAttribute(a, 3));
+      }
+      g.setIndex(new THREE.BufferAttribute(used.length > 65535 ? idx : Uint16Array.from(idx), 1));
+      g.computeBoundingSphere();
+      g.computeBoundingBox();
+      for (const v of used) remap[v] = -1;
+      out.push(g);
+    }
+    return out;
   }
 
   /** Coarse open-sea floor that sits slightly below the detailed mesh. */
