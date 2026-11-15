@@ -2,7 +2,8 @@
 // shape. Only deer and swans cast shadows. userData.parts (legs, neck, wings, tail, feathers,
 // claws, flippers, fluke) stays compatible with update / _animate.
 import { ANIMALS } from '../config/city.layout.js';
-import { mulberry32 } from '../core/Utils.js';
+import { mulberry32, mergeSimple } from '../core/Utils.js';
+import { LAYER_UNDERWATER } from '../core/RenderCulling.js';
 
 const THREE = window.THREE;
 
@@ -21,6 +22,8 @@ const INFO = {
 };
 
 const SWIMMERS = new Set(['duck', 'turtle', 'swan']);
+// Drawn in the water's refraction pass (they swim, dive or walk the wet sand).
+const IN_WATER = new Set(['duck', 'turtle', 'swan', 'dolphin', 'fish', 'crab']);
 
 // One material and one geometry per shape. Parts only differ by position, rotation and scale,
 // so sharing them is the same picture with a few dozen buffers instead of one per animal.
@@ -51,6 +54,51 @@ function part(geo, material, x, y, z, sx = 1, sy = 1, sz = 1, shadow = false) {
   m.castShadow = shadow;
   m.receiveShadow = false;
   return m;
+}
+
+// Rigid parts that share a material become one mesh. Animated parts (userData.parts) keep their own
+// transforms; the rigid meshes inside an animated pivot are merged within that pivot. Identical
+// animals reuse one merged geometry.
+const _merged = new Map();
+function mergeRigid(root) {
+  const animated = new Set();
+  const collect = (v) => {
+    if (!v) return;
+    if (v.isObject3D) animated.add(v);
+    else if (Array.isArray(v)) v.forEach(collect);
+    else if (typeof v === 'object') Object.values(v).forEach(collect);
+  };
+  collect(root.userData.parts);
+  const visit = (node) => {
+    const groups = new Map();
+    for (const c of node.children.slice()) {
+      if (c.children.length) { visit(c); continue; }
+      if (!c.isMesh || animated.has(c)) continue;
+      const k = `${c.material.uuid}|${c.castShadow}`;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(c);
+    }
+    for (const list of groups.values()) {
+      if (list.length < 2) continue;
+      const key = list[0].material.uuid + list.map((m) => {
+        m.updateMatrix();
+        return `${m.geometry.uuid}:${m.matrix.elements.map((e) => e.toFixed(4)).join(',')}`;
+      }).join(';');
+      let geo = _merged.get(key);
+      if (!geo) {
+        const parts = list.map((m) => (m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone()).applyMatrix4(m.matrix));
+        geo = mergeSimple(parts);
+        parts.forEach((g) => g.dispose());
+        _merged.set(key, geo);
+      }
+      const mesh = new THREE.Mesh(geo, list[0].material);
+      mesh.castShadow = list[0].castShadow;
+      mesh.receiveShadow = false;
+      for (const m of list) node.remove(m);
+      node.add(mesh);
+    }
+  };
+  visit(root);
 }
 
 /** Cartoon eyes. `s` scales the pair; they face +Z. */
@@ -532,6 +580,8 @@ export class Animals {
       a.target = this._landPoint(a.island, obj.position);
     }
     if (spec.type === 'deer') obj.scale.setScalar(0.95 + rng() * 0.2);
+    mergeRigid(obj);
+    if (IN_WATER.has(spec.type)) obj.traverse((o) => o.layers.enable(LAYER_UNDERWATER));
     const info = { ...INFO[spec.type], id: `${spec.type}-${this.list.length}` };
     obj.traverse((o) => { o.userData.pick = info; });
     a.obj = obj;
