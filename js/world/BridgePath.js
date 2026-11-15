@@ -3,6 +3,15 @@
 // may be offset sideways and sit on different plateau heights, so the deck is a smooth curve in plan
 // (cubic Hermite between the two abutments) and climbs or descends between the two heights.
 
+// Road tunnel cross-section (meters above the deck) and how its portals sit in the hillside.
+export const TUNNEL = {
+  wall: 4.0,        // vertical wall height before the vault starts
+  crown: 7.6,       // vault apex
+  cover: 1.0,       // least rock above the crown inside the tunnel
+  portal: 10,       // ground must stand this far above the deck where a portal opens
+  shoulder: 12,     // width of the cut banks that blend the approach back into the hillside
+};
+
 // Mostly linear climb with eased ends, so the steepest grade stays close to the average.
 const ease = (t) => 0.4 * t + 0.6 * t * t * (3 - 2 * t);
 
@@ -21,6 +30,23 @@ export function abutmentDistance(field, x, z, dir, maxDist = 600) {
   return null;
 }
 
+/**
+ * Lay every tunnel road from `configs` into the field: find its portals on the natural ground, then
+ * cut the open approaches. Returns Map(id -> { path, portals }) measured before the cut.
+ */
+export function carveTunnelRoads(field, configs, roadStyle) {
+  const out = new Map();
+  for (const cfg of configs) {
+    if (cfg.style !== 'tunnel') continue;
+    const path = new BridgePath(cfg, field);
+    const portals = path.portals(field);
+    const half = ((cfg.lanes || 2) * roadStyle.laneWidth) / 2 + roadStyle.sidewalk + 1;
+    field.carveRoad(path, portals, half, TUNNEL.shoulder);
+    out.set(cfg.id, { path, portals });
+  }
+  return out;
+}
+
 export class BridgePath {
   /**
    * cfg: { from: [x, z], dir: [dx, dz], end: [x, z], endDir: [dx, dz], style }
@@ -30,8 +56,11 @@ export class BridgePath {
     const norm = (v) => { const l = Math.hypot(v[0], v[1]); return [v[0] / l, v[1] / l]; };
     this.dA = norm(cfg.dir);
     this.dB = norm(cfg.endDir);
-    const tA = abutmentDistance(field, cfg.from[0], cfg.from[1], this.dA);
-    const tB = abutmentDistance(field, cfg.end[0], cfg.end[1], [-this.dB[0], -this.dB[1]]);
+    this.tunnel = cfg.style === 'tunnel';
+    // A tunnel road runs over land: its ends sit `lead` meters past the road ends instead of at the shore.
+    const lead = cfg.lead || [0, 0];
+    const tA = this.tunnel ? lead[0] : abutmentDistance(field, cfg.from[0], cfg.from[1], this.dA);
+    const tB = this.tunnel ? lead[1] : abutmentDistance(field, cfg.end[0], cfg.end[1], [-this.dB[0], -this.dB[1]]);
     this.ok = tA !== null && tB !== null;
     this.start = cfg.from;
     this.end = cfg.end;
@@ -40,7 +69,7 @@ export class BridgePath {
     this.hA = field.heightAt(...this.A);
     this.hB = field.heightAt(...this.B);
     // A bridge that already climbs to a higher island needs little extra crown over the water.
-    const crown = { arch: 2.6, cable: 4.5, beam: 3.4, viaduct: 7 }[cfg.style] || 3;
+    const crown = { arch: 2.6, cable: 4.5, beam: 3.4, viaduct: 7, tunnel: 0 }[cfg.style] ?? 3;
     this.rise = crown * Math.min(1, Math.max(0.15, 1 - Math.abs(this.hB - this.hA) / 7));
 
     // Hermite tangents scaled to the chord give a gentle S when the ends are offset sideways.
@@ -89,6 +118,22 @@ export class BridgePath {
     const c = Math.min(Math.max(s, 0), 1);
     const k = Math.sin(Math.PI * c);
     return this.hA + (this.hB - this.hA) * ease(c) + this.rise * k * k;
+  }
+
+  /**
+   * Tunnel portals [s0, s1]: the first and last points where the ground stands TUNNEL.portal meters
+   * above the deck, scanning in from each end. Null when the road never goes under a hill.
+   */
+  portals(field) {
+    const n = Math.ceil(this.length / 0.5);
+    const high = (i) => {
+      const s = i / n, c = this.at(s);
+      return field.heightAt(c.x, c.z) >= this.deckY(s) + TUNNEL.portal;
+    };
+    let i0 = 0, i1 = n;
+    while (i0 <= n && !high(i0)) i0++;
+    while (i1 >= 0 && !high(i1)) i1--;
+    return i0 < i1 ? [i0 / n, i1 / n] : null;
   }
 
   /** Closest centerline point to (x, z): { s, across } (across > 0 to the right of travel), or null past the ends. */

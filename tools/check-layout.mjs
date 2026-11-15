@@ -5,7 +5,7 @@ import { deflateSync } from 'zlib';
 import { ISLANDS, TERRAIN, CITY_GROUND } from '../js/config/world.config.js';
 import { ROADS, ROAD_STYLE, BRIDGES, LANDMARKS, LOTS } from '../js/config/city.layout.js';
 import { IslandField } from '../js/world/IslandField.js';
-import { BridgePath } from '../js/world/BridgePath.js';
+import { BridgePath, TUNNEL, carveTunnelRoads } from '../js/world/BridgePath.js';
 
 // Keep in sync with the building modules' `footprint`.
 const FOOTPRINTS = {
@@ -86,8 +86,34 @@ LOTS.small.forEach((l, i) => {
   checkRect(`small lot #${i}`, l.position[0], l.position[1], swap ? l.size[1] : l.size[0], swap ? l.size[0] : l.size[1], 0);
 });
 
+// Tunnels: same cut as js/world/Terrain.js. The road needs rock over the whole bore between the portals.
+const tunnels = carveTunnelRoads(field, BRIDGES, ROAD_STYLE);
+for (const [id, { path, portals }] of tunnels) {
+  if (!portals) { errors.push(`tunnel ${id} never goes under a hill`); continue; }
+  const hw = halfTotal(BRIDGES.find((b) => b.id === id).lanes || 2);
+  let maxGrade = 0, minCover = Infinity, maxStep = 0;
+  const n = Math.ceil(path.length / 2);
+  for (let i = 0; i <= n; i++) {
+    const s = i / n;
+    if (i < n) maxGrade = Math.max(maxGrade, Math.abs(path.deckY((i + 1) / n) - path.deckY(s)) / (path.length / n));
+    const c = path.at(s), y = path.deckY(s);
+    if (s > portals[0] && s < portals[1]) {
+      for (const [r, top] of [[0, TUNNEL.crown], [-hw, TUNNEL.wall], [hw, TUNNEL.wall]]) {
+        minCover = Math.min(minCover, field.heightAt(c.x - c.tz * r, c.z + c.tx * r) - y - top);
+      }
+    } else if (s < portals[0] - 0.01 || s > portals[1] + 0.01) {
+      maxStep = Math.max(maxStep, Math.abs(field.heightAt(c.x, c.z) - (y - 0.12)));
+    }
+  }
+  const len = (portals[1] - portals[0]) * path.length;
+  console.log(`tunnel ${id}: length ${path.length.toFixed(0)} m (bore ${len.toFixed(0)} m), max grade ${(maxGrade * 100).toFixed(1)}%, min rock cover ${minCover.toFixed(1)} m, approach off-grade ${maxStep.toFixed(2)} m`);
+  if (maxGrade > 0.08) errors.push(`tunnel ${id} is too steep (${(maxGrade * 100).toFixed(1)}%)`);
+  if (minCover < TUNNEL.cover) errors.push(`tunnel ${id} bore breaks through the hillside (cover ${minCover.toFixed(1)} m)`);
+  if (maxStep > 0.1) errors.push(`tunnel ${id} approach does not sit on the cut ground (${maxStep.toFixed(2)} m)`);
+}
+
 // Bridges: same curve as js/world/Bridges.js.
-const bridges = BRIDGES.map((b) => {
+const bridges = BRIDGES.filter((b) => b.style !== 'tunnel').map((b) => {
   const path = new BridgePath(b, field);
   if (!path.ok) { errors.push(`bridge ${b.id} never reaches the water`); return { b, path }; }
   const endIsland = field.islandAt(...b.end);
@@ -144,6 +170,19 @@ for (const { b, path } of bridges) {
   for (let i = 0; i < n; i++) {
     const c = path.at((i + 0.5) / n);
     fillRect(c.x, c.z, path.length / n + 1, w, Math.atan2(-c.tz, c.tx), [200, 200, 205]);
+  }
+  for (const [p, q] of [[b.from, path.A], [path.B, b.end]]) {
+    fillRect((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, Math.abs(p[0] - q[0]) || w, Math.abs(p[1] - q[1]) || w, 0, [70, 70, 75]);
+  }
+}
+for (const [id, { path, portals }] of tunnels) {
+  const b = BRIDGES.find((t) => t.id === id);
+  const w = (b.lanes || 2) * ROAD_STYLE.laneWidth + 2 * ROAD_STYLE.sidewalk;
+  const n = Math.ceil(path.length / 2);
+  for (let i = 0; i < n; i++) {
+    const s = (i + 0.5) / n, c = path.at(s);
+    const bore = portals && s > portals[0] && s < portals[1];
+    fillRect(c.x, c.z, path.length / n + 1, w, Math.atan2(-c.tz, c.tx), bore ? [40, 40, 40] : [70, 70, 75]);
   }
   for (const [p, q] of [[b.from, path.A], [path.B, b.end]]) {
     fillRect((p[0] + q[0]) / 2, (p[1] + q[1]) / 2, Math.abs(p[0] - q[0]) || w, Math.abs(p[1] - q[1]) || w, 0, [70, 70, 75]);

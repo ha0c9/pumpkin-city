@@ -103,9 +103,22 @@ export class App {
     this.animals = new Animals(ctx, this.terrain, this.ground, ctx.mask, this.water);
 
     this.controls = new CameraControls(camera, renderer.domElement, {
-      groundHeight: (x, z) => {
+      groundHeight: (x, z, nearY) => {
         const b = this.bridges.heightAt(x, z);
+        // A walker on a deck stays on it where a hill rises over the road (tunnel bores and mouths).
+        if (b !== null && nearY !== undefined && nearY < b + 2.5) return Math.max(b, 0);
         return Math.max(this.terrain.heightAt(x, z), b === null ? -Infinity : b, 0);
+      },
+      ceilingAt: (x, z, nearY) => {
+        const t = this.bridges.tunnelAt(x, z);
+        return t && nearY < t.ceiling ? t.ceiling : Infinity;
+      },
+      // Inside a tunnel the walker leaves only through a portal, not through the rock beside the bore.
+      blocked: (fx, fz, x, z, nearY) => {
+        const t = this.bridges.tunnelAt(fx, fz);
+        if (!t || nearY >= t.ceiling || this.bridges.tunnelAt(x, z)) return false;
+        const pr = t.bridge.path.project(x, z, t.bridge.width);
+        return !pr || Math.abs(pr.across) > t.bridge.width / 2;
       },
       // Building footprints keep a 2m pad so the walker is not dropped inside a
       // wall. Rooms tagged 'interior' (door, lobby, and a porch past that pad)
@@ -158,11 +171,12 @@ export class App {
     }
     const islandText = {
       central: '南瓜岛的城市中心：5×5 街区路网，美国大厦 1 号楼（办公）与 2 号楼（酒店）、美国博物馆、世界遗产博物馆、南瓜公园、江苏路第二小学、如家酒店、武夷路南侧的南瓜岛动物城警察局、南瓜大道意面馆与建筑工地都在这里。长宁路北侧是中心站地铁口。岸边浅水里有小鱼。西南的机场大桥通往机场岛。',
-      east: '东林岛：四季酒店与它的游乐园（摩天轮、旋转木马、过山车），四季路东侧是东林站地铁口。东侧山坡是林地，有松鼠。北岸浅海有海豚，岸边浅水里有小鱼。北端的明珠大桥一路下坡通往东方明珠岛。',
+      east: '东林岛：四季酒店与它的游乐园（摩天轮、旋转木马、过山车），四季路东侧是东林站地铁口。东侧山坡是林地，有松鼠。北岸浅海有海豚，岸边浅水里有小鱼。北端的明珠大桥一路下坡通往东方明珠岛，四季路南端接南林隧道，穿山通往南湾岛。',
       north: '北原岛：群岛中地势最高的台地，北原斜拉桥一路上坡通到这里。雾林路边的幽灵博物馆是一座阴森小木屋，北原路旁是天文馆，雾林路北侧是北原站地铁口，南端是南瓜岛医院，楼顶有直升机往返美国大厦。草原和松林里有野兔与松鼠，岸边浅水里有小鱼。',
       pearl: '东方明珠岛：粉红明珠串起的东方明珠电视塔与香槟金色的福来大厦隔陆家嘴路相望，陆家嘴路南侧是明珠站地铁口。南侧是明珠马术训练场，草地上有孔雀，经明珠大桥与东林岛相连。',
       west: '西岭岛：高出海面的台地，科技馆坐落在西岭路旁，科技路西侧是西岭站地铁口。西侧山岭上松林茂密，常有小鹿和孔雀出没，近海有海豚，岸边浅水里有小鱼。',
-      south: '南湾岛：海边停泊着巨轮造型的海洋博物馆，旁边是贝壳屋顶的海洋美术馆，南湾路上是南湾机械厂，南湾路南侧是南湾站地铁口。沙滩上有螃蟹，浅水里有海龟和小鱼，近岸还有海豚，外海也常有海豚跃出水面。',
+      south: '南湾岛：海边停泊着巨轮造型的海洋博物馆，旁边是贝壳屋顶的海洋美术馆，南湾路上是南湾机械厂，南湾路南侧是南湾站地铁口。沙滩上有螃蟹，浅水里有海龟和小鱼，近岸还有海豚，外海也常有海豚跃出水面。南湾路向东经南林岭与南林隧道通往东林岛。',
+      ridge: '南林岭：连接南湾岛与东林岛的一条不规则陆地，中部隆起一座约 47 米高的山，山坡上松林与阔叶林茂密，林间有小鹿和松鼠。南林隧道从山腹穿过，两端是开凿出的路堑引道，汽车和步行都能通过。',
       airport: '机场岛：南瓜机场占着岛的中部。1 号、2 号航站楼是圆弧顶的两层玻璃幕墙，下层开门，上层接廊桥，西端有电梯。迎宾路南侧是机场站地铁口。塔台在楼侧面的空地上。飞机起飞后飞到天边，再从天边进场；台风天停飞，其他天气恢复。经机场大桥与南瓜中心岛相连。',
     };
     for (const isl of this.terrain.islands) {
@@ -175,10 +189,11 @@ export class App {
       } });
     }
     for (const b of this.bridges.items) {
-      const mid = b.point(0.5, 0, 6);
+      // A tunnel's middle is inside the mountain, so its label sits over the south portal.
+      const mid = b.portals ? b.point(b.portals[0], 0, 14) : b.point(0.5, 0, 6);
       it.addLabel(b.cfg.name, '', mid, 'bridge');
       const info = b.group.userData.pick;
-      places.push({ name: b.cfg.name, tag: '桥梁', info });
+      places.push({ name: b.cfg.name, tag: b.portals ? '隧道' : '桥梁', info });
     }
     this.places = places;
     this.ui.setPlaces(places, (p) => {

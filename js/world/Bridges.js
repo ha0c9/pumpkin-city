@@ -1,8 +1,8 @@
 // Bridges between islands: curved, sloped decks between two road ends (see BridgePath.js).
 import { BRIDGES, ROADS, ROAD_STYLE } from '../config/city.layout.js';
 import { roadTexture, paverTexture, concreteTexture } from '../core/Textures.js';
-import { rodMatrix, instancedFrom } from '../core/Utils.js';
-import { BridgePath } from './BridgePath.js';
+import { rodMatrix, instancedFrom, textTexture } from '../core/Utils.js';
+import { BridgePath, TUNNEL } from './BridgePath.js';
 
 const THREE = window.THREE;
 
@@ -10,7 +10,10 @@ export class Bridge {
   constructor(cfg, terrain) {
     this.cfg = cfg;
     this.id = cfg.id;
-    this.path = new BridgePath(cfg, terrain.field);
+    // Tunnel roads were laid (and the ground cut) by Terrain before the mesh was built.
+    const laid = terrain.tunnels?.get(cfg.id);
+    this.path = laid ? laid.path : new BridgePath(cfg, terrain.field);
+    this.portals = laid?.portals || null;
     const P = this.path;
     this.start = new THREE.Vector2(...P.start);
     this.end = new THREE.Vector2(...P.end);
@@ -46,6 +49,15 @@ export class Bridge {
     const pr = this.path.project(x, z, this.width);
     if (!pr || Math.abs(pr.across) > this.width / 2) return null;
     return this.deckY(pr.s) + (Math.abs(pr.across) > this.carriage / 2 ? 0.2 : 0.03);
+  }
+
+  /** Inside the bore: { deck, ceiling, bridge } at (x, z), or null. */
+  tunnelAt(x, z) {
+    if (!this.portals) return null;
+    const pr = this.path.project(x, z, this.width);
+    if (!pr || Math.abs(pr.across) > this.width / 2 || pr.s < this.portals[0] || pr.s > this.portals[1]) return null;
+    const y = this.deckY(pr.s);
+    return { deck: y + (Math.abs(pr.across) > this.carriage / 2 ? 0.2 : 0.03), ceiling: y + TUNNEL.crown - 1.5, bridge: this };
   }
 }
 
@@ -129,12 +141,25 @@ export class Bridges {
   }
 
   heightAt(x, z) {
+    return this.deckAt(x, z)?.h ?? null;
+  }
+
+  /** Highest deck at (x, z): { bridge, h }, or null. */
+  deckAt(x, z) {
     let best = null;
     for (const b of this.items) {
       const h = b.heightAt(x, z);
-      if (h !== null && (best === null || h > best)) best = h;
+      if (h !== null && (best === null || h > best.h)) best = { bridge: b, h };
     }
     return best;
+  }
+
+  tunnelAt(x, z) {
+    for (const b of this.items) {
+      const t = b.tunnelAt(x, z);
+      if (t) return t;
+    }
+    return null;
   }
 
   _build(b, terrain) {
@@ -159,6 +184,10 @@ export class Bridges {
       add(sweep(b, walk, { segments: segs, unit: 2 }), this.mats.paver, false);
       const curb = side < 0 ? [[-hc, 0.2], [-hc, 0.03]] : [[hc, 0.03], [hc, 0.2]];
       add(sweep(b, curb, { segments: segs, unit: 2 }), this.mats.concrete, false);
+    }
+    if (b.cfg.style === 'tunnel') {
+      this._buildTunnel(b, g, add);
+      return;
     }
     add(sweep(b, [[hw, 0.2], [hw, -thick], [-hw, -thick], [-hw, 0.2]], { segments: segs, unit: 3 }), this.mats.concrete);
 
@@ -349,5 +378,115 @@ export class Bridges {
     }
     this.group.add(g);
     b.group = g;
+  }
+
+  /** Road on the cut ground, a lined and lit bore between the portals, and a portal facade at each end. */
+  _buildTunnel(b, g, add) {
+    const hw = b.width / 2, { wall, crown } = TUNNEL;
+    const [s0, s1] = b.portals || [0.5, 0.5];
+    const open = (s) => s < s0 || s > s1;
+    if (!this.mats.tile) {
+      this.mats.tile = new THREE.MeshStandardMaterial({ map: this.mats.concrete.map, color: 0xeee9dc, roughness: 0.45, side: THREE.DoubleSide });
+      this.mats.vault = new THREE.MeshStandardMaterial({ map: this.mats.concrete.map, color: 0x8f8d88, roughness: 0.9, side: THREE.DoubleSide });
+      this.mats.tunnelLight = new THREE.MeshStandardMaterial({ color: 0x333333, emissive: 0xfff0c8, emissiveIntensity: 1.6 });
+      this.ctx.nightMaterials.push({ material: this.mats.tunnelLight, intensity: 1.6, always: true });
+    }
+    add(sweep(b, [[hw, 0.2], [hw, -0.6], [-hw, -0.6], [-hw, 0.2]], { segments: Math.ceil(b.L / 2), unit: 3 }), this.mats.concrete, false);
+
+    if (b.portals) {
+      const segs = Math.max(8, Math.ceil((s1 - s0) * b.L / 2));
+      const band = 3.0;
+      for (const side of [-1, 1]) {
+        const r = side * hw;
+        add(sweep(b, side > 0 ? [[r, 0.2], [r, band]] : [[r, band], [r, 0.2]], { segments: segs, unit: 2, s0, s1 }), this.mats.tile);
+      }
+      const vault = [[hw, band], [hw, wall]];
+      for (let i = 1; i < 18; i++) {
+        const a = Math.PI * i / 18;
+        vault.push([hw * Math.cos(a), wall + (crown - wall) * Math.sin(a)]);
+      }
+      vault.push([-hw, wall], [-hw, band]);
+      add(sweep(b, vault, { segments: segs, unit: 3, s0, s1 }), this.mats.vault);
+      // Two continuous light strips just under the vault, on all day like real tunnel lighting.
+      for (const a of [0.36, 0.64]) {
+        const at = (da) => {
+          const t = Math.PI * (a + da);
+          return [hw * 0.985 * Math.cos(t), wall + (crown - wall) * 0.985 * Math.sin(t)];
+        };
+        add(sweep(b, [at(-0.012), at(0.012)], { segments: segs, unit: 2, s0, s1 }), this.mats.tunnelLight, false);
+      }
+      this._portals(b, g, [s0, s1]);
+    }
+
+    // Street lamps on the open approaches only.
+    const lampN = Math.max(2, Math.round(b.L / 22));
+    for (let i = 0; i <= lampN; i++) {
+      const s = i / lampN;
+      if (!open(s) || Math.abs(s - s0) * b.L < 8 || Math.abs(s - s1) * b.L < 8) continue;
+      const side = i % 2 === 0 ? 1 : -1;
+      const p = b.point(s, side * (hw - 0.45), 0.2);
+      const c = b.path.at(s);
+      this.lamps.push({ x: p.x, y: p.y, z: p.z, dirX: side * c.tz, dirZ: -side * c.tx });
+    }
+
+    const len = Math.round((s1 - s0) * b.L);
+    const info = {
+      id: b.id, name: b.cfg.name, nameEn: b.cfg.nameEn, category: '隧道 Tunnel',
+      description: `穿过南林岭的山体，连接${b.fromIsland ? b.fromIsland.name : ''}与${b.toIsland.name}。隧道长约 ${len} 米，连同两端的路堑引道全长约 ${Math.round(b.L)} 米，${b.lanes} 车道，双侧检修道，洞内有全天开启的照明灯带。`,
+    };
+    g.traverse((o) => { o.userData.pick = info; });
+    const entry = b.point(Math.max(0, s0 - 18 / b.L), 0, 4);
+    info.focus = [entry.x, entry.y, entry.z];
+    info.radius = 55;
+    this.ctx.pickables.push(g);
+    // Keep trees and props off the road and its cut banks; the hillside over the bore stays wooded.
+    const pieces = Math.ceil(b.L / 6);
+    for (let i = 0; i < pieces; i++) {
+      const s = (i + 0.5) / pieces;
+      if (!open(s)) continue;
+      const c = b.path.at(s);
+      this.ctx.mask.addRect(c.x, c.z, b.L / pieces + 2, b.width + TUNNEL.shoulder, Math.atan2(-c.tz, c.tx), 'bridge');
+    }
+    this.group.add(g);
+    b.group = g;
+  }
+
+  _portals(b, g, ends) {
+    const hw = b.width / 2, { wall, crown } = TUNNEL, W = hw + 6.5, depth = 1.4;
+    const shape = new THREE.Shape();
+    shape.moveTo(-W, -1.5);
+    shape.lineTo(-hw, -1.5);
+    shape.lineTo(-hw, wall);
+    for (let i = 1; i < 24; i++) {
+      const a = Math.PI - Math.PI * i / 24;
+      shape.lineTo(hw * Math.cos(a), wall + (crown - wall) * Math.sin(a));
+    }
+    shape.lineTo(hw, wall);
+    shape.lineTo(hw, -1.5);
+    shape.lineTo(W, -1.5);
+    shape.lineTo(W, 4.5);
+    shape.quadraticCurveTo(W * 0.55, crown + 3.2, 0, crown + 3.2);
+    shape.quadraticCurveTo(-W * 0.55, crown + 3.2, -W, 4.5);
+    shape.lineTo(-W, -1.5);
+    const facade = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 12 });
+    const plate = new THREE.MeshStandardMaterial({
+      map: textTexture([b.cfg.name, b.cfg.nameEn.toUpperCase()], { width: 1024, height: 256, bg: '#1d5b3c', font: 'bold 104px "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif', subFont: '600 50px sans-serif' }),
+      roughness: 0.6,
+    });
+    const plateGeo = new THREE.PlaneGeometry(7.2, 1.8);
+    ends.forEach((s, k) => {
+      const c = b.path.at(s), dir = k === 0 ? 1 : -1;
+      const tx = c.tx * dir, tz = c.tz * dir;
+      const p = b.point(s, 0, 0);
+      const m = new THREE.Mesh(facade, this.mats.concrete);
+      m.position.set(p.x - tx * depth, p.y, p.z - tz * depth);
+      m.rotation.y = Math.atan2(tx, tz);
+      m.castShadow = true; m.receiveShadow = true;
+      g.add(m);
+      const sign = new THREE.Mesh(plateGeo, plate);
+      sign.position.set(p.x - tx * (depth + 0.03), p.y + crown + 1.4, p.z - tz * (depth + 0.03));
+      sign.rotation.y = Math.atan2(-tx, -tz);
+      g.add(sign);
+    });
   }
 }

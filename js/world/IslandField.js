@@ -122,6 +122,32 @@ export class IslandField {
     return a + (b - a) * tz;
   }
 
+  /**
+   * Cut (or fill) the baked grid so a road along `path` (BridgePath) lies on the ground, with banks
+   * blending back over `shoulder` meters. Between the tunnel portals [s0, s1] the hill is left intact.
+   */
+  carveRoad(path, portals, halfWidth, shoulder) {
+    const n = this.n, half = this.size / 2, reach = halfWidth + shoulder;
+    const [minX, minZ, maxX, maxZ] = path.bounds;
+    const i0 = Math.max(0, Math.floor((minX - reach + half) / this.cell));
+    const i1 = Math.min(n - 1, Math.ceil((maxX + reach + half) / this.cell));
+    const j0 = Math.max(0, Math.floor((minZ - reach + half) / this.cell));
+    const j1 = Math.min(n - 1, Math.ceil((maxZ + reach + half) / this.cell));
+    const [s0, s1] = portals || [2, 2];
+    for (let j = j0; j <= j1; j++) {
+      const z = -half + j * this.cell;
+      for (let i = i0; i <= i1; i++) {
+        const x = -half + i * this.cell;
+        const p = path.project(x, z, reach);
+        if (!p || Math.abs(p.across) > reach || (p.s > s0 && p.s < s1)) continue;
+        const k = j * n + i;
+        const w = 1 - smoothstep(halfWidth, reach, Math.abs(p.across));
+        this.grid[k] += (path.deckY(p.s) - 0.12 - this.grid[k]) * w;
+        if (w > 0) this.influence[k] = 1;
+      }
+    }
+  }
+
   influencedAt(x, z) {
     const half = this.size / 2;
     const i = Math.round((x + half) / this.cell), j = Math.round((z + half) / this.cell);

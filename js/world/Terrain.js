@@ -2,7 +2,9 @@
 // Heights come from IslandField (pure math, also used by tools/check-layout.mjs).
 import { ISLANDS, TERRAIN, WATER, QUALITY, CITY_GROUND } from '../config/world.config.js';
 import { fbm, smoothstep, clamp } from '../core/Utils.js';
+import { BRIDGES, ROAD_STYLE } from '../config/city.layout.js';
 import { IslandField } from './IslandField.js';
+import { carveTunnelRoads, TUNNEL } from './BridgePath.js';
 
 const THREE = window.THREE;
 const TILE = 150; // meters per terrain tile
@@ -44,6 +46,8 @@ export class Terrain {
     this.field = new IslandField(ISLANDS, { ...TERRAIN, plateau: CITY_GROUND });
     this.islands = this.field.islands;
     this.size = TERRAIN.size;
+    this.tunnels = carveTunnelRoads(this.field, BRIDGES, ROAD_STYLE);
+    this.portalBoxes = this._portalBoxes();
     this.mesh = this._buildMesh();
     this.seabedMesh = this._buildSeabed();
     this.depthTexture = this._bakeDepthTexture(1024);
@@ -208,9 +212,41 @@ export class Terrain {
     return mesh;
   }
 
+  /**
+   * A heightfield cannot overhang, so right behind each portal the ground climbs from the road to
+   * the hillside straight across the tunnel mouth. Each box (origin + inward tangent, half width,
+   * top, depth) marks the bore there; the terrain shader discards fragments inside it.
+   */
+  _portalBoxes() {
+    const boxes = [];
+    for (const [id, { path, portals }] of this.tunnels) {
+      if (!portals) continue;
+      const cfg = BRIDGES.find((b) => b.id === id);
+      const half = ((cfg.lanes || 2) * ROAD_STYLE.laneWidth) / 2 + ROAD_STYLE.sidewalk - 0.05;
+      portals.forEach((s, k) => {
+        const c = path.at(s), dir = k === 0 ? 1 : -1;
+        boxes.push(
+          new THREE.Vector4(c.x, c.z, c.tx * dir, c.tz * dir),
+          new THREE.Vector4(half, path.deckY(s) + TUNNEL.crown + 0.1, 10, 0),
+        );
+      });
+    }
+    return boxes;
+  }
+
   _patchMaterial(mat) {
     const u = this.ctx.uniforms;
+    const boxes = this.portalBoxes;
+    const portalClip = boxes.length ? /* glsl */`
+          for (int i = 0; i < ${boxes.length / 2}; i++) {
+            vec4 o = uPortals[i * 2], e = uPortals[i * 2 + 1];
+            vec2 d = vWorldPos.xz - o.xy;
+            float along = dot(d, o.zw);
+            float across = abs(d.y * o.z - d.x * o.w);
+            if (along > -4.0 && along < e.z && across < e.x && vWorldPos.y < e.y) discard;
+          }` : '';
     mat.onBeforeCompile = (shader) => {
+      if (boxes.length) shader.uniforms.uPortals = { value: boxes };
       shader.uniforms.uTime = u.uTime;
       shader.uniforms.uRain = u.uRain;
       shader.uniforms.uDaylight = u.uDaylight;
@@ -225,8 +261,10 @@ export class Terrain {
           varying vec3 vWorldPos;
           uniform float uTime; uniform float uRain; uniform float uDaylight;
           uniform sampler2D uSimTex; uniform vec4 uSimBounds; uniform vec3 uWaterTint;
+          ${boxes.length ? `uniform vec4 uPortals[${boxes.length}];` : ''}
           ${NOISE_GLSL}
           ${CAUSTICS_GLSL}`)
+        .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>${portalClip}`)
         .replace('#include <color_fragment>', `#include <color_fragment>
           float detail = vnoise(vWorldPos.xz * 0.9) * 0.5 + vnoise(vWorldPos.xz * 3.7) * 0.35 + vnoise(vWorldPos.xz * 0.21) * 0.6;
           diffuseColor.rgb *= 0.78 + detail * 0.32;

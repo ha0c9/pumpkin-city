@@ -44,6 +44,12 @@ export const ISLANDS = [
     hills: [[-15, 550, 38, 7]],
   },
   {
+    // Wooded land bridge from South Cove to East Grove, with a mountain the Nanlin Tunnel runs through.
+    id: 'ridge', name: '南林岭', nameEn: 'Nanlin Ridge', x: 392, z: 372, seed: 89, coast: 24, ground: 4.5,
+    blobs: [[300, 455, 46], [345, 428, 58], [392, 372, 104], [446, 306, 60], [474, 252, 46]],
+    hills: [[392, 372, 96, 50], [425, 300, 40, 12], [330, 455, 34, 9]],
+  },
+  {
     id: 'pearl', name: '东方明珠岛', nameEn: 'Pearl Isle', x: 520, z: -360, seed: 67, coast: 20, ground: 4,
     blobs: [[520, -365, 98], [598, -418, 60], [448, -412, 60], [528, -280, 54], [610, -332, 46], [490, -468, 46], [555, -440, 55], [620, -450, 48], [655, -510, 90], [590, -530, 62], [710, -470, 55]],
     hills: [],
