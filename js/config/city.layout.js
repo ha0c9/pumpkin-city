@@ -350,4 +350,6 @@ export const ANIMALS = [
   { type: 'fish', count: 4, near: 'west' },
   { type: 'fish', count: 4, near: 'east' },
   { type: 'fish', count: 4, near: 'pearl' },
+  { type: 'deer', count: 3, island: 'ridge' },
+  { type: 'squirrel', count: 3, island: 'ridge' },
 ];
