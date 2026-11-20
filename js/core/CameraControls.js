@@ -18,11 +18,18 @@ const ORBIT_FOV = 55;
 const WALK_FOV = 70;
 
 export class CameraControls {
-  constructor(camera, dom, { groundHeight, walkable = () => true, limit = 800 }) {
+  /**
+   * groundHeight(x, z, nearY?): walking surface; nearY (the walker's feet) picks a tunnel floor over
+   * the hill above it. ceilingAt(x, z, nearY): head room there. blocked(fromX, fromZ, x, z, nearY):
+   * true when a step would leave through a wall.
+   */
+  constructor(camera, dom, { groundHeight, walkable = () => true, ceilingAt = () => Infinity, blocked = () => false, limit = 800 }) {
     this.camera = camera;
     this.dom = dom;
     this.groundHeight = groundHeight;
     this.walkable = walkable;
+    this.ceilingAt = ceilingAt;
+    this.blocked = blocked;
     this.limit = limit;
     this.mode = 'orbit';
     this.enabled = true;
@@ -462,13 +469,23 @@ export class CameraControls {
     const speed = (run ? 12 : 4.5) * (1 + this.flyHeight / 15) * dt;
     const f = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     const r = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
+    const feet = this.walkPos.y - this.eyeHeight - this.flyHeight;
+    const px = this.walkPos.x, pz = this.walkPos.z;
     this.walkPos.addScaledVector(f, fwd * speed).addScaledVector(r, strafe * speed);
     this.walkPos.x = clamp(this.walkPos.x, -this.limit, this.limit);
     this.walkPos.z = clamp(this.walkPos.z, -this.limit, this.limit);
+    if (this.blocked(px, pz, this.walkPos.x, this.walkPos.z, feet)) {
+      // Slide along the wall when only one axis is blocked.
+      if (!this.blocked(px, pz, this.walkPos.x, pz, feet)) this.walkPos.z = pz;
+      else if (!this.blocked(px, pz, px, this.walkPos.z, feet)) this.walkPos.x = px;
+      else { this.walkPos.x = px; this.walkPos.z = pz; }
+    }
     if (turn) this.yaw += turn * dt * 1.5;
     if (this.hold.zoom) this.walkFov = clamp(this.walkFov * Math.exp(-this.hold.zoom * dt * 1.2), 18, 80);
     if (up) this.flyHeight = clamp(this.flyHeight + up * dt * (run ? 30 : 10), 0, 250);
-    const ground = Math.max(0.15, this.groundHeight(this.walkPos.x, this.walkPos.z));
+    const ground = Math.max(0.15, this.groundHeight(this.walkPos.x, this.walkPos.z, feet));
+    const room = this.ceilingAt(this.walkPos.x, this.walkPos.z, feet) - ground - this.eyeHeight;
+    if (this.flyHeight > room) this.flyHeight = Math.max(0, room);
     const targetY = ground + this.eyeHeight + this.flyHeight;
     this.walkPos.y += (targetY - this.walkPos.y) * Math.min(1, dt * 10);
     this.camera.position.copy(this.walkPos);

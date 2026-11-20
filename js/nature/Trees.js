@@ -3,6 +3,8 @@ import { QUALITY } from '../config/world.config.js';
 import { makeCanvas, canvasTexture, mulberry32, fbm, smoothstep } from '../core/Utils.js';
 
 const THREE = window.THREE;
+// Wooded islands planted on their own: share of QUALITY.treeCount added on top, and pine ratio.
+const FOREST_ISLANDS = { ridge: { share: 0.2, pine: 0.55 } };
 
 /** Atlas: leaves (u 0-0.5, v 0.5-1), bark (u 0.5-1, v 0.5-1), palm frond (u 0-1, v 0-0.5). */
 function foliageAtlas() {
@@ -265,12 +267,14 @@ export class Trees {
     for (const s of fixedSpots) placements.broadleaf.push({ x: s.x, y: s.y - 0.3, z: s.z, s: 0.72 + rng() * 0.18 });
 
     // Natural placement: forests are clumped by low-frequency noise.
-    const areas = terrain.islands.map((i) => (i.landBox[2] - i.landBox[0]) * (i.landBox[3] - i.landBox[1]));
+    // Forest islands get their own pass below, so they leave the city islands' trees as they were.
+    const islands = terrain.islands.filter((i) => !FOREST_ISLANDS[i.id]);
+    const areas = islands.map((i) => (i.landBox[2] - i.landBox[0]) * (i.landBox[3] - i.landBox[1]));
     const areaSum = areas.reduce((a, b) => a + b, 0);
     const pickIsland = () => {
       let r = rng() * areaSum;
-      for (let i = 0; i < areas.length; i++) { r -= areas[i]; if (r <= 0) return terrain.islands[i]; }
-      return terrain.islands[0];
+      for (let i = 0; i < areas.length; i++) { r -= areas[i]; if (r <= 0) return islands[i]; }
+      return islands[0];
     };
     const inDowntown = (x, z) => x > -165 && x < 165 && z > -145 && z < 145;
     let attempts = 0;
@@ -312,6 +316,9 @@ export class Trees {
       placements.rock.push({ x, y: h - 0.2, z, s: 0.5 + rng() * 1.4 });
       i++;
     }
+    for (const isl of terrain.islands) {
+      if (FOREST_ISLANDS[isl.id]) this._forest(isl, FOREST_ISLANDS[isl.id], terrain, groundMap, mask, placements);
+    }
 
     this.meshes = [];
     const geos = { broadleaf: broadleaf(3), pine: pine(4), palm: palm(5), bush: bush(6) };
@@ -330,6 +337,34 @@ export class Trees {
     rockGeo.computeVertexNormals();
     this._instanced('rock', rockGeo, new THREE.MeshStandardMaterial({ color: 0x8a8378, roughness: 0.9, flatShading: true }), placements.rock, rng, true);
     this.placements = placements;
+  }
+
+  /** Dense mixed woods, thickest (and mostly pine) up the hillsides; palms along the beach. */
+  _forest(isl, { share, pine }, terrain, groundMap, mask, placements) {
+    const rng = mulberry32(isl.seed * 7919);
+    const total = Math.round(QUALITY.treeCount * share);
+    const b = isl.landBox;
+    for (let placed = 0, tries = 0; placed < total && tries < total * 40; tries++) {
+      const x = b[0] + rng() * (b[2] - b[0]), z = b[1] + rng() * (b[3] - b[1]);
+      const h = groundMap.heightAt(x, z);
+      if (h < 0.9 || terrain.field.islandAt(x, z) !== isl) continue;
+      if (!mask.isFree(x, z, 2.5) || mask.hit(x, z, 9, 'building') !== null) continue;
+      let type;
+      if (h < 1.9 && terrain.coastDistance(x, z) > -16) {
+        if (rng() > 0.35) continue;
+        type = 'palm';
+      } else if (h < 1.25) {
+        continue;
+      } else {
+        const forest = fbm(x / 45, z / 45, 3, isl.seed) * 0.5 + 0.5;
+        const high = smoothstep(isl.height + 4, isl.height + 22, h);
+        if (rng() > 0.25 + 0.45 * forest + 0.3 * high) continue;
+        type = rng() < pine * (0.6 + 0.8 * high) ? 'pine' : 'broadleaf';
+        if (rng() < 0.4) placements.bush.push({ x: x + (rng() - 0.5) * 6, y: h - 0.2, z: z + (rng() - 0.5) * 6, s: 0.7 + rng() * 0.7 });
+      }
+      placements[type].push({ x, y: h - 0.25, z, s: 0.75 + rng() * 0.55 });
+      placed++;
+    }
   }
 
   _instanced(type, geo, mat, list, rng, castShadow) {

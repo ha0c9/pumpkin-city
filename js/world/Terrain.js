@@ -2,9 +2,12 @@
 // Heights come from IslandField (pure math, also used by tools/check-layout.mjs).
 import { ISLANDS, TERRAIN, WATER, QUALITY, CITY_GROUND } from '../config/world.config.js';
 import { fbm, smoothstep, clamp } from '../core/Utils.js';
+import { BRIDGES, ROAD_STYLE } from '../config/city.layout.js';
 import { IslandField } from './IslandField.js';
+import { carveTunnelRoads, TUNNEL } from './BridgePath.js';
 
 const THREE = window.THREE;
+const TILE = 150; // meters per terrain tile
 
 export const CAUSTICS_GLSL = /* glsl */`
 float causticPattern(vec2 uv, float time) {
@@ -43,6 +46,8 @@ export class Terrain {
     this.field = new IslandField(ISLANDS, { ...TERRAIN, plateau: CITY_GROUND });
     this.islands = this.field.islands;
     this.size = TERRAIN.size;
+    this.tunnels = carveTunnelRoads(this.field, BRIDGES, ROAD_STYLE);
+    this.portalBoxes = this._portalBoxes();
     this.mesh = this._buildMesh();
     this.seabedMesh = this._buildSeabed();
     this.depthTexture = this._bakeDepthTexture(1024);
@@ -136,15 +141,59 @@ export class Terrain {
         colors[k * 3] = c.r; colors[k * 3 + 1] = c.g; colors[k * 3 + 2] = c.b;
       }
     }
-    geo.computeBoundingSphere();
-
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.93, metalness: 0 });
     this._patchMaterial(mat);
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.receiveShadow = true;
-    mesh.name = 'terrain';
-    mesh.userData.isTerrain = true;
-    return mesh;
+    const group = new THREE.Group();
+    group.name = 'terrain';
+    for (const tileGeo of this._tiles(geo, nx, Math.max(16, Math.round(TILE / cell)))) {
+      const mesh = new THREE.Mesh(tileGeo, mat);
+      mesh.receiveShadow = true;
+      mesh.name = 'terrain';
+      mesh.userData.isTerrain = true;
+      group.add(mesh);
+    }
+    geo.dispose();
+    return group;
+  }
+
+  /**
+   * Cut the grid into square tiles so each can be frustum culled (and dry or deep tiles skipped by the
+   * water passes). Normals and colors come from the full grid, so tile edges match exactly.
+   */
+  _tiles(geo, nx, tile) {
+    const index = geo.index.array;
+    const src = { position: geo.attributes.position.array, normal: geo.attributes.normal.array, color: geo.attributes.color.array };
+    const buckets = new Map();
+    for (let t = 0; t < index.length; t += 6) {
+      const a = index[t];
+      const key = Math.floor((a / nx | 0) / tile) * 4096 + Math.floor((a % nx) / tile);
+      let list = buckets.get(key);
+      if (!list) buckets.set(key, list = []);
+      for (let k = 0; k < 6; k++) list.push(index[t + k]);
+    }
+    const remap = new Int32Array(src.position.length / 3).fill(-1);
+    const out = [];
+    for (const list of buckets.values()) {
+      const used = [];
+      const idx = new Uint32Array(list.length);
+      for (let k = 0; k < list.length; k++) {
+        const v = list[k];
+        if (remap[v] < 0) { remap[v] = used.length; used.push(v); }
+        idx[k] = remap[v];
+      }
+      const g = new THREE.BufferGeometry();
+      for (const [name, arr] of Object.entries(src)) {
+        const a = new Float32Array(used.length * 3);
+        used.forEach((v, n) => { a[n * 3] = arr[v * 3]; a[n * 3 + 1] = arr[v * 3 + 1]; a[n * 3 + 2] = arr[v * 3 + 2]; });
+        g.setAttribute(name, new THREE.BufferAttribute(a, 3));
+      }
+      g.setIndex(new THREE.BufferAttribute(used.length > 65535 ? idx : Uint16Array.from(idx), 1));
+      g.computeBoundingSphere();
+      g.computeBoundingBox();
+      for (const v of used) remap[v] = -1;
+      out.push(g);
+    }
+    return out;
   }
 
   /** Coarse open-sea floor that sits slightly below the detailed mesh. */
@@ -163,9 +212,41 @@ export class Terrain {
     return mesh;
   }
 
+  /**
+   * A heightfield cannot overhang, so right behind each portal the ground climbs from the road to
+   * the hillside straight across the tunnel mouth. Each box (origin + inward tangent, half width,
+   * top, depth) marks the bore there; the terrain shader discards fragments inside it.
+   */
+  _portalBoxes() {
+    const boxes = [];
+    for (const [id, { path, portals }] of this.tunnels) {
+      if (!portals) continue;
+      const cfg = BRIDGES.find((b) => b.id === id);
+      const half = ((cfg.lanes || 2) * ROAD_STYLE.laneWidth) / 2 + ROAD_STYLE.sidewalk - 0.05;
+      portals.forEach((s, k) => {
+        const c = path.at(s), dir = k === 0 ? 1 : -1;
+        boxes.push(
+          new THREE.Vector4(c.x, c.z, c.tx * dir, c.tz * dir),
+          new THREE.Vector4(half, path.deckY(s) + TUNNEL.crown + 0.1, 10, 0),
+        );
+      });
+    }
+    return boxes;
+  }
+
   _patchMaterial(mat) {
     const u = this.ctx.uniforms;
+    const boxes = this.portalBoxes;
+    const portalClip = boxes.length ? /* glsl */`
+          for (int i = 0; i < ${boxes.length / 2}; i++) {
+            vec4 o = uPortals[i * 2], e = uPortals[i * 2 + 1];
+            vec2 d = vWorldPos.xz - o.xy;
+            float along = dot(d, o.zw);
+            float across = abs(d.y * o.z - d.x * o.w);
+            if (along > -4.0 && along < e.z && across < e.x && vWorldPos.y < e.y) discard;
+          }` : '';
     mat.onBeforeCompile = (shader) => {
+      if (boxes.length) shader.uniforms.uPortals = { value: boxes };
       shader.uniforms.uTime = u.uTime;
       shader.uniforms.uRain = u.uRain;
       shader.uniforms.uDaylight = u.uDaylight;
@@ -180,8 +261,10 @@ export class Terrain {
           varying vec3 vWorldPos;
           uniform float uTime; uniform float uRain; uniform float uDaylight;
           uniform sampler2D uSimTex; uniform vec4 uSimBounds; uniform vec3 uWaterTint;
+          ${boxes.length ? `uniform vec4 uPortals[${boxes.length}];` : ''}
           ${NOISE_GLSL}
           ${CAUSTICS_GLSL}`)
+        .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>${portalClip}`)
         .replace('#include <color_fragment>', `#include <color_fragment>
           float detail = vnoise(vWorldPos.xz * 0.9) * 0.5 + vnoise(vWorldPos.xz * 3.7) * 0.35 + vnoise(vWorldPos.xz * 0.21) * 0.6;
           diffuseColor.rgb *= 0.78 + detail * 0.32;

@@ -63,9 +63,18 @@ function markTexture() {
   return canvasTexture(c, { anisotropy: 8 });
 }
 
-function nameTexture(name, nameEn) {
-  const c = makeCanvas(1800, 420);
+// Sign canvases are drawn in layout units and stored at SIGN_SCALE: still finer than the screen shows
+// standing at the gate, at a fraction of the memory (7 stations, two sign kinds, with mipmaps).
+const SIGN_SCALE = 0.7;
+function signCanvas(w, h) {
+  const c = makeCanvas(Math.round(w * SIGN_SCALE), Math.round(h * SIGN_SCALE));
   const x = c.getContext('2d');
+  x.scale(SIGN_SCALE, SIGN_SCALE);
+  return [c, x];
+}
+
+function nameTexture(name, nameEn) {
+  const [c, x] = signCanvas(1800, 420);
   x.fillStyle = '#f6f3ee';
   x.fillRect(0, 0, 1800, 420);
   x.textAlign = 'left';
@@ -88,8 +97,7 @@ function nameTexture(name, nameEn) {
 }
 
 function totemTexture(name) {
-  const c = makeCanvas(640, 1680);
-  const x = c.getContext('2d');
+  const [c, x] = signCanvas(640, 1680);
   x.fillStyle = '#f6f3ee';
   x.fillRect(0, 0, 640, 1680);
   x.strokeStyle = '#e25b1a';

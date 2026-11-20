@@ -74,6 +74,8 @@ export const BRIDGES = [
   { id: 'bridge-west', name: '西岭大桥', nameEn: 'West Ridge Bridge', from: [-150, 0], dir: [-1, 0], to: 'west', end: [-410, -60], endDir: [-1, 0], lanes: 4, style: 'beam' },
   { id: 'bridge-south', name: '南湾拱桥', nameEn: 'South Cove Arch Bridge', from: [0, 130], dir: [0, 1], to: 'south', end: [80, 408], endDir: [0, 1], lanes: 2, style: 'arch' },
   { id: 'bridge-pearl', name: '明珠大桥', nameEn: 'Pearl Cable Bridge', from: [490, -40], dir: [0, -1], to: 'pearl', end: [500, -275], endDir: [0, -1], lanes: 2, style: 'cable' },
+  // Over land: `lead` moves the ends past the road ends; the middle runs through the Nanlin Ridge mountain.
+  { id: 'tunnel-nanlin', name: '南林隧道', nameEn: 'Nanlin Tunnel', from: [205, 490], dir: [1, 0], to: 'east', end: [490, 175], endDir: [0, -1], lanes: 2, style: 'tunnel', lead: [12, 12] },
   { id: 'bridge-airport', name: '机场大桥', nameEn: 'Airport Bridge', from: [-150, 168], dir: [0, 1], to: 'airport', end: [-500, 430], endDir: [0, 1], lanes: 2, style: 'viaduct' },
 ];
 
@@ -348,4 +350,6 @@ export const ANIMALS = [
   { type: 'fish', count: 4, near: 'west' },
   { type: 'fish', count: 4, near: 'east' },
   { type: 'fish', count: 4, near: 'pearl' },
+  { type: 'deer', count: 3, island: 'ridge' },
+  { type: 'squirrel', count: 3, island: 'ridge' },
 ];

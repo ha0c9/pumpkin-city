@@ -156,7 +156,7 @@ export class Interaction {
     const p = g.point;
     const h = this.terrain.heightAt(p.x, p.z);
     const isl = this.terrain.islandAt(p.x, p.z);
-    const onBridge = this.bridges.heightAt(p.x, p.z);
+    const deck = this.bridges.deckAt(p.x, p.z);
     let name, desc;
     if (g.water) {
       const depth = -h;
@@ -169,7 +169,8 @@ export class Interaction {
       name = isl ? `${isl.name} · ${surfaceName}` : surfaceName;
       desc = `海拔 ${h.toFixed(1)} 米。${surface === 'grass' ? '空地上长满草与树木，预留未来开发。' : ''}`;
     }
-    if (onBridge !== null) name = '桥面 Bridge deck';
+    // A tunnel deck under the mountain is not what was clicked.
+    if (deck && deck.h > h - 0.5) name = deck.bridge.portals ? '隧道引道 Tunnel approach' : '桥面 Bridge deck';
     this.marker.position.set(p.x, Math.max(h, 0) + 0.15, p.z);
     this.marker.visible = true;
     this.markerLabel.textContent = name.split(' ')[0];
@@ -218,10 +219,13 @@ export class Interaction {
     // Candidates in priority order (islands, landmarks, bridges, minor places; nearer first), then drop any label
     // that would overlap one already placed so the screen never turns into a pile of tags.
     const cands = [];
+    // Nothing outside can be seen from inside a tunnel bore.
+    const bore = this.bridges.tunnelAt(cam.position.x, cam.position.z);
+    const visible = this.labelsVisible && !(bore && cam.position.y < bore.ceiling + 2);
     for (const l of this.labels) {
       v.copy(l.position).project(cam);
       const dist = cam.position.distanceTo(l.position);
-      const ok = this.labelsVisible && v.z < 1 && v.z > -1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1 && (l.island ? dist < 2600 && dist > 260 : dist < (l.minor ? 420 : 1100));
+      const ok = visible && v.z < 1 && v.z > -1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1 && (l.island ? dist < 2600 && dist > 260 : dist < (l.minor ? 420 : 1100));
       if (ok) cands.push({ l, dist, x: (v.x * 0.5 + 0.5) * w, y: (-v.y * 0.5 + 0.5) * h });
       else if (l.shown) { l.el.style.display = 'none'; l.shown = false; }
     }
